@@ -1,4 +1,7 @@
-from imports.py import *
+from imports.py import tf
+from imports.py import Embedding
+from imports.py import np
+
 
 
 class Encodings(tf.keras.layers.Layer):
@@ -47,9 +50,6 @@ class Encodings(tf.keras.layers.Layer):
 
 
   def call(self, batch):
-    batch = batch + 2
-    batch = tf.concat([tf.expand_dims(tf.convert_to_tensor(np.ones((self.batch_size)), dtype='int64'),axis=1), batch], axis=1)
-    #embedding_out = tf.concat([self.embedding(batch), tf.expand_dims(self.class_tokens, axis=1)], axis=1)
     embedding_out = self.embedding(batch)
 
     if(self.pos_embedding_flag):
@@ -58,3 +58,4 @@ class Encodings(tf.keras.layers.Layer):
 
 
     return embedding_out
+
