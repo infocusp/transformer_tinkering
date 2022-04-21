@@ -1,4 +1,6 @@
-from imports.py import *
+from imports.py import tf
+from imports.py import np
+from imports.py import Dense
 
 class Attention(tf.keras.layers.Layer):
 
@@ -18,6 +20,12 @@ class Attention(tf.keras.layers.Layer):
     self.value = Dense(self.all_head_size)
     self.out = Dense(config['emb_dim'])
 
+  def split_heads(self, input_layer, hidden_states_shape):
+
+    return tf.reshape(input_layer, (hidden_states_shape[0], self.num_att_heads, 
+                                 hidden_states_shape[1],
+                                 self.attention_head_size))
+
   def call(self, hidden_states):
 
     #getting the query , key and value vectors
@@ -27,20 +35,29 @@ class Attention(tf.keras.layers.Layer):
 
     hidden_states_shape = tf.shape(hidden_states)
 
+
     #Dividing query keay and value vectors between given number of attention heads
-    query_layer = tf.reshape(mixed_query_layer, shape = (hidden_states_shape[0], self.num_att_heads, 
-                                 hidden_states_shape[1],
-                                 self.attention_head_size))
+    # query_layer = tf.reshape(mixed_query_layer, shape = (hidden_states_shape[0], self.num_att_heads, 
+    #                              hidden_states_shape[1],
+    #                              self.attention_head_size))
     
 
-    key_layer = tf.reshape(mixed_key_layer, shape = (hidden_states_shape[0], self.num_att_heads, 
-                                 hidden_states_shape[1],
-                                 self.attention_head_size))
+    # key_layer = tf.reshape(mixed_key_layer, shape = (hidden_states_shape[0], self.num_att_heads, 
+    #                              hidden_states_shape[1],
+    #                              self.attention_head_size))
     
-    value_layer = tf.reshape(mixed_value_layer, shape = (hidden_states_shape[0], self.num_att_heads, 
-                                 hidden_states_shape[1],
-                                 self.attention_head_size))
+    # value_layer = tf.reshape(mixed_value_layer, shape = (hidden_states_shape[0], self.num_att_heads, 
+    #                              hidden_states_shape[1],
+    #                              self.attention_head_size))
+
+    query_layer = self.split_heads(mixed_query_layer, hidden_states_shape)
+
+    key_layer = self.split_heads(mixed_key_layer, hidden_states_shape)
     
+    value_layer = self.split_heads(mixed_value_layer, hidden_states_shape)
+
+
+
     #getting the attention scores
     attention_scores = tf.matmul(query_layer, tf.transpose(key_layer, perm=[0,1,3,2]))
 
@@ -57,5 +74,6 @@ class Attention(tf.keras.layers.Layer):
     att_output = self.out(context_layer)
 
     return att_output, attention_probs
+
 
 
