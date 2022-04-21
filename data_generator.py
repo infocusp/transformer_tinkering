@@ -1,6 +1,14 @@
-from imports.py import *
-
-
+from imports.py import random
+from imports.py import sample
+from imports.py import tqdm
+from imports.py import random
+from imports.py import pd
+from imports.py import defaultdict
+from imports.py import np
+from imports.py import tf
+from imports.py import itertools
+from imports.py import math
+from imports.py import time
 
 '''
 Distance between 2 red tokens: 1
@@ -36,6 +44,11 @@ def Generate_data(vocab , problem_id , max_seq_length = 512, number_data_points 
 
     def create_sequence_and_lables(indices):
         sequence = tf.reduce_sum(tf.one_hot(indices, depth=max_seq_length, dtype='int64'), axis=0)
+
+        #adding CLS token in our data
+        sequence = sequence + 2
+        sequence = tf.concat([tf.convert_to_tensor(np.ones((1)), dtype='int64'), sequence], axis=0)
+
         label = indices[1] - indices[0]
         return sequence, label
 
