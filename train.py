@@ -16,15 +16,15 @@ import argparse
 
 
 
-input_shape = (512)
-config = hyperparams.Config()
-input = Input(input_shape)
-op, att_scores = model._Model(config)(input)
-output = Dense(1, activation='linear')(op)
+# input_shape = (512)
+# config = hyperparams.Config()
+# input = Input(input_shape)
+# op, att_scores = model._Model(config)(input)
+# output = Dense(1, activation='linear')(op)
 
-_model = Model(inputs = input, outputs=output)
+# _model = Model(inputs = input, outputs=output)
 
-_model.summary()
+# _model.summary()
 
 
 def _train(args):
