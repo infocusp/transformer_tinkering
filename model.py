@@ -196,17 +196,26 @@ class _Model(tf.keras.layers.Layer):
 
   '''
 
-  def __init__(self, emb_dim, seq_length, vocab_size, pos_embedding, num_heads, head_size, agg_method, embedding_type ):
+  def __init__(self, emb_dim, seq_length, vocab_size, pos_embedding, num_heads, head_size, agg_method, embedding_type, num_att_layers ):
 
     '''This initializes the variables andlayers required'''
 
     super().__init__()
 
     self.encodings = Encodings(emb_dim, seq_length, vocab_size, pos_embedding, embedding_type)
-    self.attention = Attention(num_heads, emb_dim)
+    self.num_heads = num_heads
+    self.emb_dim = emb_dim
     self.agg_method = agg_method
     self.head_dim = head_size
+    self.num_att_layers = num_att_layers
     self.head = Dense(self.head_dim)
+
+
+  def build(self, input_shape):
+
+    self.att_layers = []
+    for i in range(self.num_att_layers):
+      self.att_layers.append(Attention(self.num_heads, self.emb_dim))
 
 
   def call(self, input):
@@ -214,7 +223,13 @@ class _Model(tf.keras.layers.Layer):
     '''Performs all the transformations on input batch and returns the attention scores and output'''
 
     op = self.encodings(input)
-    att_op, att_scores = self.attention(op)
+
+    att_op = op
+    att_scores_list = []
+    for i in range(self.num_att_layers):
+      att_op, att_scores = self.att_layers[i](att_op)
+      att_scores_list.append(att_scores)
+
 
     if(self.agg_method == 'TOKEN'):
       #op = att_op[:,0,:]
@@ -226,4 +241,4 @@ class _Model(tf.keras.layers.Layer):
     op = self.head(op)
 
 
-    return op, att_scores
+    return op, tf.convert_to_tensor(att_scores_list, dtype='float')
