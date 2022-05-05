@@ -12,7 +12,8 @@ import model
 from dataset.py import Generate_data
 from model.py import _Model
 import argparse
-
+import seaborn as sns
+from datetime import datetime
 
 
 
@@ -44,27 +45,26 @@ class Train():
 
     '''
 
-    def __init__(self, args, train_data, test_data, batch_size):
+    def __init__(self, optimizer, loss_function, metric, train_data, test_data, batch_size, learning_rate = 0.001, epochs = 15):
 
         '''Initializes variables'''
 
-        self.args = args
-        self.optimizer = args.optimizer
-        self.loss_function = args.loss_function
-        self.metric = args.metric
+        self.optimizer = optimizer
+        self.loss_function = loss_function
+        self.metric = metric
         self.train_dataset = train_data
         self.test_dataset = test_data
         self.batch_size = batch_size
-        self.learning_rate = args.learning_rate
-        self.epochs = args.epochs
+        self.learning_rate = learning_rate
+        self.epochs = epochs
 
 
     def create_model(self):
 
       '''Creates a Model object and returns it'''
 
-      config = hyperparms.Config(self.args.num_heads, self.args.num_layers, self.args.emb_dim, self.args.seq_length, self.args.vocab_size, self.args.head_size, self.args.pos_embedding, self.args.agg_method, self.args.pos_embedding_type)
-      input_shape = (config['seq_length'] + 1)
+      config = Config()
+      input_shape = (513)
       input = Input(input_shape, dtype='int64')
       op, att_scores = _Model(config)(input)
       output = Dense(1, activation='linear')(op)
@@ -189,10 +189,74 @@ class Train():
       '''
 
       model = self.create_model()
+
+      logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+      tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=logdir)
+
       self.optimizer.learning_rate = self.learning_rate
       model.compile(optimizer= self.optimizer, loss=self.loss_function, metrics = self.metric)
-      history = model.fit(self.train_dataset, epochs = self.epochs, validation_data = self.test_dataset, steps_per_epoch = len(self.train_dataset))
-      return history
+      history = model.fit(self.train_dataset, epochs = self.epochs, validation_data = self.test_dataset, steps_per_epoch = len(self.train_dataset), callbacks=[tensorboard_callback])
+      return model, history
+
+
+
+class Test():
+
+    '''
+      This class helps us in testing our model.
+
+      The class helps in inferring a model and also plot the attention scores for our model
+
+      Attributes:
+        data_point: Test data points for which we want to test our model
+        model: trained model object which is used for inferenece and plotting attention scores
+
+    '''
+
+    def __init__(self, data_point, model):
+
+        ''' Initializes the variables '''
+
+        self.model = model
+        self.data_point = data_point
+
+    def infer(self):
+
+        ''' Gives prediction for the data points given by model '''
+
+        return self.model(self.data_point)
+
+    def attention_plots(self, layer=0, input_index=0):
+        '''
+
+          Plots heatmaps for our attention scores for a particular layer and input
+
+          layer: layer number for which we want to plot attention scores
+          input_index: input index for which we want to plot attention plots. In case of batch of inputs is sent
+
+        '''
+
+
+        _ , att_scores = self.model.layers[1](self.data_point)
+
+        layer_att_scores = att_scores[layer]
+        input_att_scores = layer_att_scores[input_index]
+        num_heads = input_att_scores.shape[0]
+
+        for head in range(num_heads):
+          head_att_score = input_att_scores[head]
+          fig = plt.figure(figsize=(16, 8))
+
+          ax = fig.add_subplot(2, 4, head+1)
+          #ax.matshow(head_att_score, cmap='viridis')
+          sns.heatmap(head_att_score, cmap='PiYG')
+          ax.set_xlabel('head {}'.format(head))
+
+        plt.tight_layout()
+        plt.show()
+
+
+
 
 
 
@@ -201,9 +265,10 @@ def _train(args):
 
     dataset_ob = dataset.DistanceDataset()
     train_dataset, test_dataset = dataset_ob.gen_data()
-    
+
     train_ob = Train(args, train_dataset, test_dataset, 64)
-    history = train_ob.train_model()
+    model, history = train_ob.train_model()
+
 
     # input_shape = (args.seq_length)
     # config = hyperparams.Config(args.num_heads, args.num_layers, args.emb_dim, args.seq_length, args.vocab_size, args.head_size, args.pos_embedding, args.agg_method, args.pos_embedding_type)
