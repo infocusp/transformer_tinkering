@@ -9,11 +9,10 @@ import numpy as np
 import hyperparams
 import dataset
 import model
-from dataset.py import Generate_data
-from model.py import _Model
 import argparse
 import seaborn as sns
 from datetime import datetime
+import io
 
 
 
@@ -27,6 +26,9 @@ from datetime import datetime
 # _model = Model(inputs = input, outputs=output)
 #
 # _model.summary()
+import io
+
+
 class Train():
 
     '''
@@ -45,28 +47,29 @@ class Train():
 
     '''
 
-    def __init__(self, optimizer, loss_function, metric, train_data, test_data, batch_size, learning_rate = 0.001, epochs = 15):
+    def __init__(self, args, train_data, test_data, batch_size):
 
         '''Initializes variables'''
 
-        self.optimizer = optimizer
-        self.loss_function = loss_function
-        self.metric = metric
+        self.args = args
+        self.optimizer = args.optimizer
+        self.loss_function = args.loss_function
+        self.metric = args.metric
         self.train_dataset = train_data
         self.test_dataset = test_data
         self.batch_size = batch_size
-        self.learning_rate = learning_rate
-        self.epochs = epochs
-
+        self.learning_rate = args.learning_rate
+        self.epochs = args.epochs
+        self.problem_id = args.problem_id
 
     def create_model(self):
 
       '''Creates a Model object and returns it'''
 
-      config = Config()
+      config = hyperparms.Config(self.args.num_heads, self.args.num_layers, self.args.emb_dim, self.args.seq_length, self.args.vocab_size, self.args.head_size, self.args.pos_embedding, self.args.agg_method, self.args.pos_embedding_type)
       input_shape = (513)
       input = Input(input_shape, dtype='int64')
-      op, att_scores = _Model(config)(input)
+      op, att_scores = model._Model(config['emb_dim'], config['seq_length'], config['vocab_size'], config['pos_embedding'], config['num_heads'], config['head_size'], config['agg_method'], config['embedding_type'], config['num_att_layers'])(input)
       output = Dense(1, activation='linear')(op)
 
       model = Model(inputs = input, outputs=output)
@@ -168,7 +171,7 @@ class Train():
         self.optimizer.learning_rate = 0.0000000001
         model = self.create_model()
         model.compile(optimizer= self.optimizer, loss=self.loss_function, metrics = self.metric)
-        model.fit(self.train_dataset, epochs = total_epoch, validation_data = self.test_dataset, steps_per_epoch = len(self.train_dataset), callbacks=[lr_callback])
+        model.fit(self.train_dataset, epochs = self.total_epoch, validation_data = self.test_dataset, steps_per_epoch = len(self.train_dataset), callbacks=[lr_callback])
 
         if(show_plot):
             plt.plot(lr, losses)
@@ -188,17 +191,94 @@ class Train():
 
       '''
 
+      class att_plots_callback(tf.keras.callbacks.Callback):
+
+          def __init__(self, log_dir, test_data, problem_id):
+
+
+              self.file_writer = tf.summary.create_file_writer(log_dir)
+              self.test_data = test_data
+              self.problem_id = problem_id
+              self.images = None
+
+
+          def plot_to_image(self, figure):
+
+            """Converts the matplotlib plot specified by 'figure' to a PNG image and
+            returns it. The supplied figure is closed and inaccessible after this call."""
+
+            # Save the plot to a PNG in memory.
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png')
+            # Closing the figure prevents it from being displayed directly inside
+            # the notebook.
+            plt.close(figure)
+            buf.seek(0)
+            # Convert PNG buffer to TF image
+            image = tf.image.decode_png(buf.getvalue(), channels=4)
+            # Add the batch dimension
+            image = tf.expand_dims(image, 0)
+            return image
+
+
+          def on_epoch_end(self, epoch, logs=None):
+
+              """Runs metrics and histogram summaries at epoch end."""
+              data_point = None
+
+              for batch in self.test_data:
+                  data_point = batch[0][:1]
+                  break
+
+              _ , att_scores = self.model.layers[1](data_point)
+              index = 0
+
+              fig, ax = plt.subplots(att_scores.shape[0], att_scores.shape[2], figsize=(16,16))
+
+              fig.figsize = (16*att_scores.shape[0], 16*att_scores.shape[2])
+
+              if(self.problem_id == 1):
+
+                  for i in range(att_scores.shape[0]):
+                        for j in range(att_scores.shape[2]):
+                          ax[i][j].matshow(att_scores[i][0][j], cmap='viridis', )
+
+                          #ax[i][j].matshow(att_scores[i][0][j], cmap='viridis')
+                          ax[i][j].set_title('epoch {} layer {}, head {}'.format(epoch, i, j))
+                          ax[i][j].set_xticks(ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 3])
+                          ax[i][j].set_yticks(ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 3])
+                          ax[i][j].set_xticklabels([3,3])
+                          ax[i][j].set_yticklabels([3,3])
+
+                  if(self.images is not None):
+                      self.images = tf.concat([self.images, self.plot_to_image(fig)], axis = 0)
+                  else:
+                      self.images = self.plot_to_image(fig)
+
+
+                  print(self.images.shape)
+
+                  with self.file_writer.as_default():
+                    tf.summary.image("Training data", self.images, step=0)
+
+
+
+
+
+
       model = self.create_model()
 
       logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
-      tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=logdir)
+      tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir = logdir, histogram_freq = 1)
+      att_plots = att_plots_callback(logdir, self.test_dataset, self.problem_id)
+      file_writer = tf.summary.create_file_writer(logdir)
 
       self.optimizer.learning_rate = self.learning_rate
       model.compile(optimizer= self.optimizer, loss=self.loss_function, metrics = self.metric)
-      history = model.fit(self.train_dataset, epochs = self.epochs, validation_data = self.test_dataset, steps_per_epoch = len(self.train_dataset), callbacks=[tensorboard_callback])
+      history = model.fit(self.train_dataset, epochs = self.epochs, validation_data = self.test_dataset, steps_per_epoch = len(self.train_dataset), callbacks=[tensorboard_callback,
+                                                                                                                                              att_plots])
+
       return model, history
-
-
 
 class Test():
 
