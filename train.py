@@ -2,11 +2,13 @@ from tensorflow.keras.layers import Dense, Input
 from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import backend as K
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from tensorflow.keras.callbacks import  ReduceLROnPlateau
 import numpy as np
-import hyperparams
+import hyperparms
 import dataset
 import model
 import argparse
@@ -52,7 +54,7 @@ class Train():
         '''Initializes variables'''
 
         self.args = args
-        self.optimizer = args.optimizer
+        self.optimizer = tf.keras.optimizers.get(args.optimizer)
         self.loss_function = args.loss_function
         self.metric = args.metric
         self.train_dataset = train_data
@@ -74,11 +76,11 @@ class Train():
           input_shape = (config['seq_length'])
 
       input = Input(input_shape, dtype='int64')
-      op, att_scores = model._Model(config['emb_dim'], config['seq_length'], config['vocab_size'], config['pos_embedding'], config['num_heads'], config['head_size'], config['agg_method'], config['embedding_type'], config['num_att_layers'])(input)
+      op, att_scores = model._Model(config['emb_dim'], config['seq_length'], config['vocab_size'], config['pos_embedding'], config['num_heads'], config['head_size'], config['agg_method'], config['pos_embedding_type'], config['num_att_layers'])(input)
       output = Dense(1, activation='linear')(op)
 
-      model = Model(inputs = input, outputs=output)
-      return model
+      att_model = Model(inputs = input, outputs=output)
+      return att_model
 
     def get_lr_range(self, total_epoch = 3, show_plot = True):
 
@@ -344,28 +346,6 @@ class Test():
 
 
 
-class testCases():
-
-    def __init__(self):
-        pass
-
-    def testDataset(self, problem_id, batch_size):
-
-        def assertCases(ob, data_len):
-
-            train_dataset, test_dataset = ob.gen_data()
-
-            for batch in train_dataset:
-                assert batch[0].dtype == tf.int64 and batch[1].dtype == tf.int32, "Data Type has to be int64 or int32"
-
-            return 'Passed'
-
-
-        if(problem_id == 1):
-            ob = dataset.DistanceDataset(agg_method = 'TOKEN')
-            data_len = 513
-            print(assertCases(ob, data_len))
-
 
 
 
@@ -394,15 +374,15 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--num_heads', type=int, default=1, help='Number of Attention Heads')
-    parser.add_arguments('--num_layers', type=int, default=1, help='Number of Attention Layers')
-    parser.add_arguments('--emb_dim', type=int, default=128, help='Embedding Dimensions')
-    parser.add_arguments('--seq_length', type=int, default=512, help='input seq length')
-    parser.add_arguments('--vocab_size', type=int, default=2, help='length of vocab for input')
-    parser.add_arguments('--head_size', type=int, default=64, help='Size of the single dense layer head')
-    parser.add_arguments('--pos_embedding', type=bool, default=True, help='Weather to use positional embedding or not')
-    parser.add_arguments('--agg_method', type=str, default='TOKEN', help='Method used to feed into head. TOKEN Uses CLS token, SUM adds the output from attention')
-    parser.add_arguments('--pos_embedding_type', type=str, default='SIN_COS', help='Which type of positional encoding to use. SIN_COS for alternating sin cos, RANDOM for random pos encodings')
-    parser.add_arguments('--problem_num', type=int, default=1, help=''' Integer indicating which problem to solve?
+    parser.add_argument('--num_layers', type=int, default=1, help='Number of Attention Layers')
+    parser.add_argument('--emb_dim', type=int, default=128, help='Embedding Dimensions')
+    parser.add_argument('--seq_length', type=int, default=512, help='input seq length')
+    parser.add_argument('--vocab_size', type=int, default=2, help='length of vocab for input')
+    parser.add_argument('--head_size', type=int, default=64, help='Size of the single dense layer head')
+    parser.add_argument('--pos_embedding', type=bool, default=True, help='Weather to use positional embedding or not')
+    parser.add_argument('--agg_method', type=str, default='TOKEN', help='Method used to feed into head. TOKEN Uses CLS token, SUM adds the output from attention')
+    parser.add_argument('--pos_embedding_type', type=str, default='SIN_COS', help='Which type of positional encoding to use. SIN_COS for alternating sin cos, RANDOM for random pos encodings')
+    parser.add_argument('--problem_id', type=int, default=1, help=''' Integer indicating which problem to solve?
     										Distance between 2 red tokens: 1
 										Count number of red tokens: 2
 										Find token that appears maximum time: 3
@@ -413,11 +393,11 @@ if __name__ == '__main__':
 										MAx: 8
 										Min: 9
     										''')
-    parser.add_arguments('--optimizer', type=str, default='adam', help='Which optimizer to use for training')
-    parser.add_arguments('--loss_function', type=str, default='mean_squared_error', help='Which Loss Function to use for training')
-    parser.add_arguments('--metric', type=str, default='mean_squared_error', help='Which metric to use for training')
-    parser.add_arguments('--learning_rate', type=float, default=0.001, help='Which learning rate to use for training')
-    parser.add_arguments('--epochs', type=int, default=15, help='Number of epochs to run for training')
+    parser.add_argument('--optimizer', type=str, default='adam', help='Which optimizer to use for training')
+    parser.add_argument('--loss_function', type=str, default='mean_squared_error', help='Which Loss Function to use for training')
+    parser.add_argument('--metric', type=str, default='mean_squared_error', help='Which metric to use for training')
+    parser.add_argument('--learning_rate', type=float, default=0.001, help='Which learning rate to use for training')
+    parser.add_argument('--epochs', type=int, default=15, help='Number of epochs to run for training')
     args = parser.parse_args()
 
     _train(args)
