@@ -1,6 +1,7 @@
 from tensorflow.keras.layers import Embedding, Dense, Input
 import tensorflow as tf
 import numpy as np
+import math
 
 
 class Encodings(tf.keras.layers.Layer):
