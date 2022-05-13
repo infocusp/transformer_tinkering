@@ -22,14 +22,14 @@ class Config:
 
     self.dic = {
     'num_heads' : num_heads,
-    'num_layers': num_layers,
+    'num_att_layers': num_layers,
     'emb_dim': emb_dim,
     'seq_length': seq_length,
     'vocab_size': vocab_size,
     'head_size': head_size, #size of single dense layer head
     'pos_embedding': pos_embedding, #True or False weather to learn positional embeddings
     'agg_method': agg_method, #one of TOKEN or SUM
-    'pos_embedding_type':SIN_COS, #one of RANDOM or SIN_COS
+    'pos_embedding_type':pos_embedding_type, #one of RANDOM or SIN_COS
     'log_dir': "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S"),
     'lr_range': (0.0000000001, 10) #LR range to find a good lr
     }
@@ -40,4 +40,4 @@ class Config:
     try:
       return(self.dic[name])
     except:
-      logger.info('!!!!!!!! NO Such PARAMETER PRESENT !!!!!!!!!!!')
+      logger.info('!!!!!!!! {}, NO Such PARAMETER PRESENT !!!!!!!!!!!'.format(name))
