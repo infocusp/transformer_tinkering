@@ -1,10 +1,12 @@
 import sys
 import logging
+from datetime import datetime
 
 logger = logging.getLogger('')
 logger.setLevel(logging.DEBUG)
 
 sh = logging.StreamHandler(sys.stdout)
+formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
 sh.setFormatter(formatter)
 logger.addHandler(sh)
 
@@ -27,7 +29,9 @@ class Config:
     'head_size': head_size, #size of single dense layer head
     'pos_embedding': pos_embedding, #True or False weather to learn positional embeddings
     'agg_method': agg_method, #one of TOKEN or SUM
-    'pos_embedding_type':SIN_COS #one of RANDOM or SIN_COS
+    'pos_embedding_type':SIN_COS, #one of RANDOM or SIN_COS
+    'log_dir': "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S"),
+    'lr_range': (0.0000000001, 10) #LR range to find a good lr
     }
 
 
