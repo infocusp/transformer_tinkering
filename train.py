@@ -61,13 +61,18 @@ class Train():
         self.learning_rate = args.learning_rate
         self.epochs = args.epochs
         self.problem_id = args.problem_id
+        self.config = hyperparms.Config(self.args.num_heads, self.args.num_layers, self.args.emb_dim, self.args.seq_length, self.args.vocab_size, self.args.head_size, self.args.pos_embedding, self.args.agg_method, self.args.pos_embedding_type)
 
     def create_model(self):
 
       '''Creates a Model object and returns it'''
 
-      config = hyperparms.Config(self.args.num_heads, self.args.num_layers, self.args.emb_dim, self.args.seq_length, self.args.vocab_size, self.args.head_size, self.args.pos_embedding, self.args.agg_method, self.args.pos_embedding_type)
-      input_shape = (513)
+      config = self.config
+      if(config['agg_method'] == 'TOKEN'):
+          input_shape = (config['seq_length'] + 1)
+      else:
+          input_shape = (config['seq_length'])
+
       input = Input(input_shape, dtype='int64')
       op, att_scores = model._Model(config['emb_dim'], config['seq_length'], config['vocab_size'], config['pos_embedding'], config['num_heads'], config['head_size'], config['agg_method'], config['embedding_type'], config['num_att_layers'])(input)
       output = Dense(1, activation='linear')(op)
@@ -148,8 +153,8 @@ class Train():
                 losses.append(l)
 
                 '''we will start from small lr e-10 to e10 and check our plot for these values'''
-                start_lr = 0.0000000001
-                end_lr = 10
+                start_lr = self.config['lr_range'][0]
+                end_lr = self.config['lr_range'][1]
 
                 '''Number of batch updates in each epoch'''
                 #step_size = (len(self.X_train) // self.batch_size)
@@ -168,7 +173,7 @@ class Train():
 
         lr_callback = LrCallback(self.train_dataset, self.batch_size)
 
-        self.optimizer.learning_rate = 0.0000000001
+        self.optimizer.learning_rate = self.config['lr_range'][0]
         model = self.create_model()
         model.compile(optimizer= self.optimizer, loss=self.loss_function, metrics = self.metric)
         model.fit(self.train_dataset, epochs = self.total_epoch, validation_data = self.test_dataset, steps_per_epoch = len(self.train_dataset), callbacks=[lr_callback])
@@ -191,7 +196,7 @@ class Train():
 
       '''
 
-      class att_plots_callback(tf.keras.callbacks.Callback):
+      class attPlotsCallback(tf.keras.callbacks.Callback):
 
           def __init__(self, log_dir, test_data, problem_id):
 
@@ -268,9 +273,9 @@ class Train():
 
       model = self.create_model()
 
-      logdir = "logs/scalars/" + datetime.now().strftime("%Y%m%d-%H%M%S")
+      logdir = self.config['log_dir']
       tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir = logdir, histogram_freq = 1)
-      att_plots = att_plots_callback(logdir, self.test_dataset, self.problem_id)
+      att_plots = attPlotsCallback(logdir, self.test_dataset, self.problem_id)
       file_writer = tf.summary.create_file_writer(logdir)
 
       self.optimizer.learning_rate = self.learning_rate
@@ -279,6 +284,8 @@ class Train():
                                                                                                                                               att_plots])
 
       return model, history
+
+
 
 class Test():
 
@@ -336,6 +343,28 @@ class Test():
         plt.show()
 
 
+
+class testCases():
+
+    def __init__(self):
+        pass
+
+    def testDataset(self, problem_id, batch_size):
+
+        def assertCases(ob, data_len):
+
+            train_dataset, test_dataset = ob.gen_data()
+
+            for batch in train_dataset:
+                assert batch[0].dtype == tf.int64 and batch[1].dtype == tf.int32, "Data Type has to be int64 or int32"
+
+            return 'Passed'
+
+
+        if(problem_id == 1):
+            ob = dataset.DistanceDataset(agg_method = 'TOKEN')
+            data_len = 513
+            print(assertCases(ob, data_len))
 
 
 
