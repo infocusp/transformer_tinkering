@@ -16,6 +16,7 @@ logger = logging.getLogger('')
 logger.setLevel(logging.DEBUG)
 
 sh = logging.StreamHandler(sys.stdout)
+formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
 sh.setFormatter(formatter)
 logger.addHandler(sh)
 
@@ -70,8 +71,13 @@ class Dataset:
 
             label = indices[1] - indices[0]
 
+        elif(self.agg_method == 'SUM'):
+
+            sequence = tf.reduce_sum(tf.one_hot(indices, depth=self.max_seq_length, dtype='int64'), axis=0)
+            label = indices[1] - indices[0]
+
         else:
-            sequence = tf.reduce_sum(tf.one_hot(tf.range(indices[0],indices[1]), depth=self.max_seq_length), axis=0)
+            sequence = tf.reduce_sum(tf.one_hot(tf.range(indices[0],indices[1]), depth=self.max_seq_length, dtype='int64'), axis=0)
             label = indices[1] - indices[0]
 
         return sequence, label
@@ -256,7 +262,7 @@ class DistanceDataset(Dataset):
 
         '''Initializes our variables'''
 
-        Dataset.__init__(self, agg_method, max_seq_length, number_data_points)
+        Dataset.__init__(self, agg_method = agg_method, max_seq_length = max_seq_length, number_of_data_points = number_data_points)
 
 
         self.max_seq_length = max_seq_length
@@ -268,7 +274,7 @@ class DistanceDataset(Dataset):
 
         '''This method generates the data for our problem'''
 
-        logger.info('**************GENERATING DATA FOR PROBLEM 1 *************\n')
+        #logger.info('**************GENERATING DATA FOR PROBLEM 1 *************\n')
 
         indices = [[i, j] for i in range(self.max_seq_length) for j in range(i+1, self.max_seq_length)]
 
@@ -315,7 +321,7 @@ class CountRedTokenDataset(Dataset):
 
         '''This method generates the data for our problem'''
 
-        logger.info('**************GENERATING DATA FOR PROBLEM 2 *************\n')
+        #logger.info('**************GENERATING DATA FOR PROBLEM 2 *************\n')
 
         dataset = tf.data.Dataset.from_tensor_slices(tf.range(self.number_data_points))
         dataset = dataset.map(self.map_int_to_sequence, num_parallel_calls=tf.data.AUTOTUNE)
@@ -323,8 +329,8 @@ class CountRedTokenDataset(Dataset):
         train_size = int(0.8 * self.number_data_points)
         train_dataset, test_dataset = dataset.take(train_size), dataset.skip(train_size)
 
-        train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()))
-        test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()))
+        train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True)
+        test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder = True)
 
 
         return train_dataset, test_dataset
@@ -356,7 +362,7 @@ class MaxTokenDataset(Dataset):
 
       '''generates data for problem 3'''
 
-      logger.info('**************GENERATING DATA FOR PROBLEM 3 *************\n')
+      #logger.info('**************GENERATING DATA FOR PROBLEM 3 *************\n')
 
       dataset = tf.data.Dataset.from_tensor_slices(tf.range(self.number_data_points))
 
@@ -367,8 +373,8 @@ class MaxTokenDataset(Dataset):
       train_size = int(0.8 * self.number_data_points)
       train_dataset, test_dataset = dataset.take(train_size), dataset.skip(train_size)
 
-      train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()))
-      test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()))
+      train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder= True)
+      test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True)
 
 
       return train_dataset, test_dataset
@@ -390,7 +396,7 @@ class SeqLenDataset(Dataset):
 
         '''Initializes our variables'''
 
-        Dataset.__init__(self)
+        Dataset.__init__(self, agg_method = None)
 
 
         self.max_seq_length = max_seq_length
@@ -401,7 +407,7 @@ class SeqLenDataset(Dataset):
 
       '''generates data for problem 3'''
 
-      logger.info('**************GENERATING DATA FOR PROBLEM 4 *************\n')
+      #logger.info('**************GENERATING DATA FOR PROBLEM 4 *************\n')
 
       indices = [[0, j] for j in range(1, self.max_seq_length)]
 
@@ -414,8 +420,8 @@ class SeqLenDataset(Dataset):
       train_dataset, test_dataset = dataset.take(train_size), dataset.skip(train_size)
 
 
-      train_dataset = train_dataset.batch(64)
-      test_dataset = test_dataset.batch(64)
+      train_dataset = train_dataset.batch(64, drop_remainder=True)
+      test_dataset = test_dataset.batch(64, drop_remainder = True)
 
       return train_dataset, test_dataset
 
@@ -451,7 +457,7 @@ class PalindromeDataset(Dataset):
 
         '''Generates data'''
 
-        logger.info('**************GENERATING DATA FOR PROBLEM 5 *************\n')
+        #logger.info('**************GENERATING DATA FOR PROBLEM 5 *************\n')
 
 
         dataset = tf.data.Dataset.from_tensor_slices(tf.range(1,self.number_data_points))
@@ -461,8 +467,8 @@ class PalindromeDataset(Dataset):
         train_size = int(0.8 * self.number_data_points)
         train_dataset, test_dataset = dataset.take(train_size), dataset.skip(train_size)
 
-        train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()))
-        test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()))
+        train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True)
+        test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True)
 
 
         return train_dataset, test_dataset
@@ -499,7 +505,7 @@ class SortedDataset(Dataset):
 
           '''Generates data'''
 
-          logger.info('**************GENERATING DATA FOR PROBLEM 6 *************\n')
+          #logger.info('**************GENERATING DATA FOR PROBLEM 6 *************\n')
 
 
           dataset = tf.data.Dataset.from_tensor_slices(tf.range(self.number_data_points))
@@ -511,8 +517,8 @@ class SortedDataset(Dataset):
           train_size = int(0.8 * self.number_data_points)
           train_dataset, test_dataset = dataset.take(train_size), dataset.skip(train_size)
 
-          train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()))
-          test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()))
+          train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True)
+          test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True)
 
 
           return train_dataset, test_dataset
@@ -551,8 +557,8 @@ class SumDataset(Dataset):
         train_size = int(0.8 * self.number_data_points)
         train_dataset, test_dataset = dataset.take(train_size), dataset.skip(train_size)
 
-        train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()))
-        test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()))
+        train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True)
+        test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder = True)
 
 
         return train_dataset, test_dataset
@@ -591,8 +597,8 @@ class MaxDataset(Dataset):
         train_size = int(0.8 * self.number_data_points)
         train_dataset, test_dataset = dataset.take(train_size), dataset.skip(train_size)
 
-        train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()))
-        test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()))
+        train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True)
+        test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder= True)
 
 
         return train_dataset, test_dataset
@@ -632,8 +638,8 @@ class MinDataset(Dataset):
         train_size = int(0.8 * self.number_data_points)
         train_dataset, test_dataset = dataset.take(train_size), dataset.skip(train_size)
 
-        train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()))
-        test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()))
+        train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True, padding_values = tf.constant(100, dtype='int64'))
+        test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder= True, padding_values = tf.constant(100, dtype='int64'))
 
 
         return train_dataset, test_dataset
