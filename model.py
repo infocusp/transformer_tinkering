@@ -1,8 +1,10 @@
 from tensorflow.keras.layers import Embedding, Dense, Input
 import tensorflow as tf
+tf.get_logger().setLevel('ERROR')
 import numpy as np
 import math
-
+import warnings
+warnings.filterwarnings("ignore")
 
 class Encodings(tf.keras.layers.Layer):
 
@@ -66,7 +68,10 @@ class Encodings(tf.keras.layers.Layer):
 
     '''Performs transformations on our given batch of data'''
 
+    #print(batch)
     embedding_out = self.embedding(batch)
+    #print(embedding_out)
+    embedding_out *= tf.math.sqrt(tf.cast(self.embedding_dim, tf.float32))
 
     if(self.pos_embedding_flag and self.embedding_type == 'SIN_COS'):
       pos_embedding = self.sinusodial_pos_embedding(tf.range(self.seq_length + 1))
@@ -107,19 +112,58 @@ class Attention(tf.keras.layers.Layer):
     self.num_att_heads = num_heads
     self.attention_head_size = int(emb_dim / self.num_att_heads)
     self.all_head_size = self.num_att_heads * self.attention_head_size
+    self.emb_dim = emb_dim
 
     self.query = Dense(self.all_head_size)
     self.key = Dense(self.all_head_size)
     self.value = Dense(self.all_head_size)
     self.out = Dense(emb_dim)
+    # self.wq = [tf.keras.layers.Dense(self.attention_head_size) for _ in range(self.num_att_heads)]
+    # self.wk = [tf.keras.layers.Dense(self.attention_head_size) for _ in range(self.num_att_heads)]
+    # self.wv = [tf.keras.layers.Dense(self.attention_head_size) for _ in range(self.num_att_heads)]
+    # self.wo = tf.keras.layers.Dense(self.all_head_size)
+
 
   def split_heads(self, input_layer, hidden_states_shape):
 
     '''Splits the input matrix between attention heads'''
 
-    return tf.reshape(input_layer, (hidden_states_shape[0], self.num_att_heads,
-                                 hidden_states_shape[1],
-                                 self.attention_head_size))
+    return tf.transpose(tf.reshape(input_layer, (hidden_states_shape[0],
+                                 -1,
+                                 self.num_att_heads,
+                                 self.attention_head_size)
+                                 ), perm=[0,2,1,3])
+
+
+
+  # def call(self, hidden_states):
+  #   # query has shape (batch, query_len, model_size)
+  #   # value has shape (batch, value_len, model_size)
+  #   heads = []
+  #   att_scores = []
+  #   hidden_states_shape = tf.shape(hidden_states)
+  #   for i in range(self.num_att_heads):
+  #     score = tf.matmul(self.wq[i](hidden_states), self.wk[i](hidden_states), transpose_b=True)
+  #
+  #     # Here we scale the score as described in the paper
+  #     score /= tf.math.sqrt(tf.dtypes.cast(self.attention_head_size, tf.float32))
+  #     # score has shape (batch, query_len, value_len)
+  #
+  #     alignment = tf.nn.softmax(score, axis=2)
+  #     # alignment has shape (batch, query_len, value_len)
+  #
+  #     att_scores.append(alignment)
+  #
+  #     head = tf.matmul(alignment, self.wv[i](hidden_states))
+  #     # head has shape (batch, decoder_len, value_size)
+  #     heads.append(head)
+  #
+  #   # Concatenate all the attention heads
+  #   # so that the last dimension summed up to model_size
+  #   heads = tf.concat(heads, axis=2)
+  #   heads = self.wo(heads)
+  #   # heads has shape (batch, query_len, model_size)
+  #   return heads, tf.transpose(tf.convert_to_tensor(att_scores, dtype='float32'), perm=[1,0,2,3])
 
   def call(self, hidden_states):
 
@@ -156,17 +200,18 @@ class Attention(tf.keras.layers.Layer):
 
 
     #getting the attention scores
-    attention_scores = tf.matmul(query_layer, tf.transpose(key_layer, perm=[0,1,3,2]))
+    attention_scores = tf.matmul(query_layer, key_layer, transpose_b=True)
 
     attention_scores = attention_scores / math.sqrt(self.attention_head_size)
 
     attention_probs = tf.nn.softmax(attention_scores, axis=-1)
 
     #getting the attention output
-    context_layer = tf.matmul(attention_probs, value_layer)
+    context_layer = tf.transpose(tf.matmul(attention_probs, value_layer),perm=[0,2,1,3])
+
     context_layer = tf.reshape(context_layer, shape=( hidden_states_shape[0],
-                                                         hidden_states_shape[1],
-                                                         hidden_states_shape[2]))
+                                                         -1,
+                                                         self.emb_dim))
 
     att_output = self.out(context_layer)
 

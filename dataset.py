@@ -5,12 +5,15 @@ import pandas as pd
 from collections import defaultdict
 import numpy as np
 import tensorflow as tf
+tf.get_logger().setLevel('ERROR')
 import itertools
 import math
 import time
 import hyperparms
 import sys
 import logging
+import warnings
+warnings.filterwarnings("ignore")
 
 logger = logging.getLogger('')
 logger.setLevel(logging.DEBUG)
@@ -19,7 +22,8 @@ sh = logging.StreamHandler(sys.stdout)
 formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
 sh.setFormatter(formatter)
 logger.addHandler(sh)
-
+logging.getLogger('matplotlib.font_manager').disabled = True
+logging.getLogger('matplotlib').setLevel(level=logging.CRITICAL)
 
 '''
 Distance between 2 red tokens: 1
@@ -69,16 +73,18 @@ class Dataset:
             sequence = tf.concat([tf.convert_to_tensor(np.ones((1)), dtype='int64'), sequence], axis=0)
 
 
-            label = indices[1] - indices[0]
+            label = (indices[1] - indices[0])/(self.max_seq_length)
+
 
         elif(self.agg_method == 'SUM'):
 
             sequence = tf.reduce_sum(tf.one_hot(indices, depth=self.max_seq_length, dtype='int64'), axis=0)
-            label = indices[1] - indices[0]
+            label = (indices[1] - indices[0]) / (self.max_seq_length)
 
         else:
             sequence = tf.reduce_sum(tf.one_hot(tf.range(indices[0],indices[1]), depth=self.max_seq_length, dtype='int64'), axis=0)
-            label = indices[1] - indices[0]
+            label = (indices[1] - indices[0]) / (self.max_seq_length)
+            sequence = tf.concat([[2],sequence], axis=0)
 
         return sequence, label
 
@@ -92,10 +98,18 @@ class Dataset:
 
       '''Method is used to generate data for problem 2'''
 
-      sequence = tf.py_function(self.int_to_sequence, [i], tf.int32)
-      label = tf.reduce_sum(sequence)
+      if(self.agg_method == 'TOKEN'):
+
+          sequence = tf.py_function(self.int_to_sequence, [i], tf.int32)
+          label = tf.reduce_sum(sequence)
+          sequence = tf.concat([[2], sequence], axis=0)
+
+      else:
+          sequence = tf.py_function(self.int_to_sequence, [i], tf.int32)
+          label = tf.reduce_sum(sequence)
+
       # Adding 1 to differentiate between padding value and token ids
-      return tf.add(sequence, 1), label
+      return tf.add(sequence, 1), label / self.max_seq_length
 
 
 
@@ -109,21 +123,33 @@ class Dataset:
         num_zero = len([1 for char in b if char == '0'])
 
         if(num_zero > num_one):
-          point = [self.vocab[i%len(self.vocab)] if char == '0' else self.vocab[((self.max_seq_length - len(b)) + index)%len(self.vocab)] for index,char in enumerate(b)]
+          #point = [self.vocab[i%len(self.vocab)] if char == '0' else self.vocab[((self.max_seq_length - len(b)) + index)%len(self.vocab)] for index,char in enumerate(b)]
+          point = [i%len(self.vocab) if char == '0' else ((self.max_seq_length - len(b)) + index)%len(self.vocab) for index,char in enumerate(b)]
 
         else:
-          point = [self.vocab[i%len(self.vocab)] if char == '1' else self.vocab[((self.max_seq_length - len(b)) + index)%len(self.vocab)] for index,char in enumerate(b)]
+          #point = [self.vocab[i%len(self.vocab)] if char == '1' else self.vocab[((self.max_seq_length - len(b)) + index)%len(self.vocab)] for index,char in enumerate(b)]
+          point = [i%len(self.vocab) if char == '1' else ((self.max_seq_length - len(b)) + index)%len(self.vocab) for index,char in enumerate(b)]
 
 
-        return tf.convert_to_tensor(point,'string')
+        # rem_tokens = self.max_seq_length - len(point)
+        #
+        # while(rem_tokens):
+        #     point += '%'
+        #     rem_tokens -= 1
+
+        return tf.convert_to_tensor(point)
 
 
     def _gen_data(self, i):
 
         '''Creates data for problem 3'''
 
-        sequence = tf.py_function(self.make_data, [i], 'string')
-        label = tf.gather(self.vocab, i%len(self.vocab))
+        sequence = tf.py_function(self.make_data, [i], tf.int32)
+        #label = tf.gather(self.vocab, i%len(self.vocab))
+        #label = tf.one_hot([(i%len(self.vocab))], depth=len(self.vocab))[0]
+        label = tf.convert_to_tensor((i%len(self.vocab)))
+        #sequence = tf.add(sequence, 1)
+        sequence = tf.concat([[26], sequence], axis=0)
         return sequence,label
 
 
@@ -144,24 +170,30 @@ class Dataset:
           b = '0'*(self.max_seq_length - len(b)) + b
           indices = [index%len(self.vocab) for index,char in enumerate(b) if char == '1']
           if(l_b %2 == 0):
-            point = [self.vocab[i] for i in indices] + [self.vocab[i] for i in indices[: : -1]]
+            #point = [self.vocab[i] for i in indices] + [self.vocab[i] for i in indices[: : -1]]
+            point = indices + indices[: : -1]
 
           else:
-            point = [self.vocab[i] for i in indices] + [self.vocab[l_b]] + [self.vocab[i] for i in indices[: : -1]]
+            #point = [self.vocab[i] for i in indices] + [self.vocab[l_b]] + [self.vocab[i] for i in indices[: : -1]]
+            point = indices + [l_b] + indices[: : -1]
       else:
           b = format(i,'b')
           l_b = len(b)
           b = '0'*(self.max_seq_length - len(b)) + b
           indices = [index%len(self.vocab) for index,char in enumerate(b) if char == '1']
-          point = [self.vocab[i] for i in indices] + [self.vocab[i] for i in [x*(x+4)%len(self.vocab) for x in indices]]
+          #point = [self.vocab[i] for i in indices] + [self.vocab[i] for i in [x*(x+4)%len(self.vocab) for x in indices]]
+          point = [i for i in indices] + [i for i in [x*(x+4)%len(self.vocab) for x in indices]]
 
-      return tf.convert_to_tensor(point,'string')
+      # return tf.convert_to_tensor(point,'string')
+      return tf.convert_to_tensor(point,'int64')
 
     def gen_data_pali(self, i):
 
         '''Generates data for palindrome data'''
 
-        sequence = tf.py_function(self.make_palindrome, [i], 'string')
+        # sequence = tf.py_function(self.make_palindrome, [i], 'string')
+        sequence = tf.py_function(self.make_palindrome, [i], 'int64')
+        sequence = tf.concat([[27], sequence], axis=0)
 
         if(i %2 == 0):
           label = 1
@@ -206,11 +238,13 @@ class Dataset:
             num.append(next)
             start = num[-1]
 
-      return tf.convert_to_tensor(list(map(lambda x: self.vocab[x] ,num)), 'string')
+      # return tf.convert_to_tensor(list(map(lambda x: self.vocab[x] ,num)), 'string')
+      return tf.convert_to_tensor(list(map(lambda x: x ,num)), tf.int64)
 
     def gen_sort_data(self, i):
 
-        sequence = tf.py_function(self.make_sort_data, [i], 'string')
+        sequence = tf.py_function(self.make_sort_data, [i], tf.int64)
+        sequence = tf.concat([[27],sequence], axis=0)
 
 
         if(i %2 == 0):
@@ -225,7 +259,12 @@ class Dataset:
 
       '''This method gives the datapoint as a tensor for problems 7,8 and 9'''
 
-      return tf.convert_to_tensor([index%len(self.vocab) for index,char in enumerate('0'*(self.max_seq_length - len(format(i,'b'))) + format(i,'b')) if char == '1'],'int64')
+      if(self.__class__.__name__ == 'MinDataset'):
+          arr = [index%len(self.vocab) if char == '1' else 11 for index,char in enumerate('0'*(self.max_seq_length - len(format(i,'b'))) + format(i,'b')) ]
+          return tf.convert_to_tensor(arr,'int64')
+      else:
+          arr = [index%len(self.vocab) if char == '1' else 0 for index,char in enumerate('0'*(self.max_seq_length - len(format(i,'b'))) + format(i,'b')) ]
+          return tf.convert_to_tensor(arr,'int64')
 
 
 
@@ -233,12 +272,18 @@ class Dataset:
 
       sequence = tf.py_function(self.make_number_data, [i], 'int64')
 
+
       if(self.__class__.__name__ == 'SumDataset'):
         label = tf.reduce_sum(sequence)
+        sequence = tf.concat([[10], sequence], axis=0)
       elif(self.__class__.__name__ == 'MaxDataset'):
         label = tf.reduce_max(sequence)
+        sequence = tf.concat([[10], sequence], axis=0)
       else:
+        #sequence = tf.convert_to_tensor([11 if t == 0 else t for t in sequence.numpy()],'int64')
+        #sequence = [index%len(self.vocab) if char == '1' else 0 for index,char in enumerate('0'*(self.max_seq_length - len(format(int(i),'b'))) + format(int(i),'b'))]
         label = tf.reduce_min(sequence)
+        sequence = tf.concat([[10], sequence], axis=0)
 
       return sequence, label
 
@@ -281,7 +326,7 @@ class DistanceDataset(Dataset):
         #sequence, label = self.create_sequence_and_lables(indices, 'TOKEN', self.max_seq_length)
 
         dataset = tf.data.Dataset.from_tensor_slices(indices)
-        dataset = dataset.shuffle(buffer_size=1024, reshuffle_each_iteration=False)
+        dataset = dataset.shuffle(buffer_size=len(indices), reshuffle_each_iteration=False)
         dataset = dataset.map(self.create_sequence_and_lables)
 
 
@@ -308,14 +353,15 @@ class CountRedTokenDataset(Dataset):
     '''
 
 
-    def __init__(self , max_seq_length = 512, number_data_points = 100000):
+    def __init__(self , agg_method = 'TOKEN', max_seq_length = 25, number_data_points = 100000):
 
         '''Initilaizes the variables'''
 
-        Dataset.__init__(self)
+        Dataset.__init__(self, agg_method = agg_method, max_seq_length = max_seq_length, number_of_data_points = number_data_points)
 
         self.max_seq_length = max_seq_length
         self.number_data_points = number_data_points
+        self.agg_method = agg_method
 
     def gen_data(self):
 
@@ -324,15 +370,19 @@ class CountRedTokenDataset(Dataset):
         #logger.info('**************GENERATING DATA FOR PROBLEM 2 *************\n')
 
         dataset = tf.data.Dataset.from_tensor_slices(tf.range(self.number_data_points))
+        dataset = dataset.shuffle(buffer_size=self.number_data_points, reshuffle_each_iteration=False)
         dataset = dataset.map(self.map_int_to_sequence, num_parallel_calls=tf.data.AUTOTUNE)
+
 
         train_size = int(0.8 * self.number_data_points)
         train_dataset, test_dataset = dataset.take(train_size), dataset.skip(train_size)
 
-        train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True)
-        test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder = True)
-
-
+        if(self.agg_method == 'TOKEN'):
+            train_dataset = train_dataset.padded_batch(64, padded_shapes=((self.max_seq_length+1,), ()), drop_remainder=True)
+            test_dataset = test_dataset.padded_batch(64, padded_shapes=((self.max_seq_length+1,), ()), drop_remainder = True)
+        else:
+            train_dataset = train_dataset.padded_batch(64, padded_shapes=((self.max_seq_length,), ()), drop_remainder=True)
+            test_dataset = test_dataset.padded_batch(64, padded_shapes=((self.max_seq_length,), ()), drop_remainder = True)
         return train_dataset, test_dataset
 
 
@@ -349,14 +399,15 @@ class MaxTokenDataset(Dataset):
 
     '''
 
-    def __init__(self , vocab, max_seq_length = 512, number_data_points = 100000):
+    def __init__(self , vocab, agg_method = 'TOKEN', max_seq_length = 512, number_data_points = 100000):
 
         '''Initilaizes the variables'''
 
-        Dataset.__init__(self, vocab)
+        Dataset.__init__(self, vocab=vocab, agg_method = agg_method, max_seq_length = max_seq_length, number_of_data_points = number_data_points)
 
         self.max_seq_length = max_seq_length
         self.number_data_points = number_data_points
+        self.agg_method = agg_method
 
     def gen_data(self):
 
@@ -367,14 +418,18 @@ class MaxTokenDataset(Dataset):
       dataset = tf.data.Dataset.from_tensor_slices(tf.range(self.number_data_points))
 
       dataset = dataset.map(self._gen_data, num_parallel_calls=tf.data.AUTOTUNE)
-      dataset = dataset.shuffle(buffer_size=1024, reshuffle_each_iteration=False)
+      dataset = dataset.shuffle(buffer_size=self.number_data_points, reshuffle_each_iteration=False)
 
 
       train_size = int(0.8 * self.number_data_points)
       train_dataset, test_dataset = dataset.take(train_size), dataset.skip(train_size)
+      if(self.agg_method == 'TOKEN'):
+          train_dataset = train_dataset.padded_batch(64, padded_shapes=((self.max_seq_length+1,), ()), drop_remainder=True,padding_values=27)
+          test_dataset = test_dataset.padded_batch(64, padded_shapes=((self.max_seq_length+1,), ()), drop_remainder = True,padding_values=27)
+      else:
+          train_dataset = train_dataset.padded_batch(64, padded_shapes=((self.max_seq_length,), ()), drop_remainder=True,padding_values=27)
+          test_dataset = test_dataset.padded_batch(64, padded_shapes=((self.max_seq_length,), ()), drop_remainder = True,padding_values=27)
 
-      train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder= True)
-      test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True)
 
 
       return train_dataset, test_dataset
@@ -412,7 +467,7 @@ class SeqLenDataset(Dataset):
       indices = [[0, j] for j in range(1, self.max_seq_length)]
 
       dataset = tf.data.Dataset.from_tensor_slices(indices)
-      dataset = dataset.shuffle(buffer_size=1024, reshuffle_each_iteration=False)
+      dataset = dataset.shuffle(buffer_size=len(indices), reshuffle_each_iteration=False)
       dataset = dataset.map(self.create_sequence_and_lables)
 
 
@@ -462,13 +517,13 @@ class PalindromeDataset(Dataset):
 
         dataset = tf.data.Dataset.from_tensor_slices(tf.range(1,self.number_data_points))
         dataset = dataset.map(self.gen_data_pali, num_parallel_calls=tf.data.AUTOTUNE)
-        dataset = dataset.shuffle(buffer_size=1024, reshuffle_each_iteration=False)
+        dataset = dataset.shuffle(buffer_size=self.number_data_points, reshuffle_each_iteration=False)
 
         train_size = int(0.8 * self.number_data_points)
         train_dataset, test_dataset = dataset.take(train_size), dataset.skip(train_size)
 
-        train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True)
-        test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True)
+        train_dataset = train_dataset.padded_batch(512, padded_shapes=((self.max_seq_length+1,), ()), drop_remainder=True)
+        test_dataset = test_dataset.padded_batch(512, padded_shapes=((self.max_seq_length+1,), ()), drop_remainder=True)
 
 
         return train_dataset, test_dataset
@@ -512,13 +567,13 @@ class SortedDataset(Dataset):
 
           dataset = dataset.map(self.gen_sort_data, num_parallel_calls=tf.data.AUTOTUNE)
 
-          dataset = dataset.shuffle(buffer_size=1024, reshuffle_each_iteration=False)
+          dataset = dataset.shuffle(buffer_size=self.number_data_points, reshuffle_each_iteration=False)
 
           train_size = int(0.8 * self.number_data_points)
           train_dataset, test_dataset = dataset.take(train_size), dataset.skip(train_size)
 
-          train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True)
-          test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True)
+          train_dataset = train_dataset.padded_batch(512, padded_shapes=((self.max_seq_length+1,), ()), drop_remainder=True)
+          test_dataset = test_dataset.padded_batch(512, padded_shapes=((self.max_seq_length+1,), ()), drop_remainder=True)
 
 
           return train_dataset, test_dataset
@@ -541,7 +596,7 @@ class SumDataset(Dataset):
 
         '''Initializes our variables'''
 
-        Dataset.__init__(self, vocab)
+        Dataset.__init__(self, vocab = vocab, max_seq_length = max_seq_length)
 
 
         self.max_seq_length = max_seq_length
@@ -552,7 +607,7 @@ class SumDataset(Dataset):
 
         dataset = tf.data.Dataset.from_tensor_slices(tf.range(2**27,2**27 + self.number_data_points))
         dataset = dataset.map(self.gen_data_mms, num_parallel_calls=tf.data.AUTOTUNE)
-        dataset = dataset.shuffle(buffer_size=1024, reshuffle_each_iteration=False)
+        dataset = dataset.shuffle(buffer_size=self.number_data_points, reshuffle_each_iteration=False)
 
         train_size = int(0.8 * self.number_data_points)
         train_dataset, test_dataset = dataset.take(train_size), dataset.skip(train_size)
@@ -592,7 +647,7 @@ class MaxDataset(Dataset):
 
         dataset = tf.data.Dataset.from_tensor_slices(tf.range(2**27,2**27 + self.number_data_points))
         dataset = dataset.map(self.gen_data_mms, num_parallel_calls=tf.data.AUTOTUNE)
-        dataset = dataset.shuffle(buffer_size=1024, reshuffle_each_iteration=False)
+        dataset = dataset.shuffle(buffer_size=self.number_data_points, reshuffle_each_iteration=False)
 
         train_size = int(0.8 * self.number_data_points)
         train_dataset, test_dataset = dataset.take(train_size), dataset.skip(train_size)
@@ -633,13 +688,13 @@ class MinDataset(Dataset):
 
         dataset = tf.data.Dataset.from_tensor_slices(tf.range(2**27,2**27 + self.number_data_points))
         dataset = dataset.map(self.gen_data_mms, num_parallel_calls=tf.data.AUTOTUNE)
-        dataset = dataset.shuffle(buffer_size=1024, reshuffle_each_iteration=False)
+        dataset = dataset.shuffle(buffer_size=self.number_data_points, reshuffle_each_iteration=False)
 
         train_size = int(0.8 * self.number_data_points)
         train_dataset, test_dataset = dataset.take(train_size), dataset.skip(train_size)
 
-        train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True, padding_values = tf.constant(100, dtype='int64'))
-        test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder= True, padding_values = tf.constant(100, dtype='int64'))
+        train_dataset = train_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder=True, padding_values = tf.constant(12, dtype='int64'))
+        test_dataset = test_dataset.padded_batch(512, padded_shapes=((None,), ()), drop_remainder= True, padding_values = tf.constant(12, dtype='int64'))
 
 
         return train_dataset, test_dataset

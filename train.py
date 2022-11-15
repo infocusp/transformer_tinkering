@@ -3,8 +3,13 @@ from tensorflow.keras.models import Model
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import backend as K
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+import random
+from PIL import Image
+
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
+tf.get_logger().setLevel('ERROR')
 import matplotlib.pyplot as plt
 from tensorflow.keras.callbacks import  ReduceLROnPlateau
 import numpy as np
@@ -15,7 +20,9 @@ import argparse
 import seaborn as sns
 from datetime import datetime
 import io
-
+import warnings
+warnings.filterwarnings("ignore")
+tf.autograph.set_verbosity(1)
 
 
 
@@ -54,6 +61,7 @@ class Train():
         '''Initializes variables'''
 
         self.args = args
+        self.seq_len = args.seq_length
         self.optimizer = tf.keras.optimizers.get(args.optimizer)
         self.loss_function = args.loss_function
         self.metric = args.metric
@@ -77,9 +85,16 @@ class Train():
 
       input = Input(input_shape, dtype='int64')
       op, att_scores = model._Model(config['emb_dim'], config['seq_length'], config['vocab_size'], config['pos_embedding'], config['num_heads'], config['head_size'], config['agg_method'], config['pos_embedding_type'], config['num_att_layers'])(input)
-      output = Dense(1, activation='linear')(op)
+
+      if(self.args.problem_id in [1,2,4,7]):
+          output = Dense(1)(op)
+      elif(self.args.problem_id in [5,6]):
+          output = Dense(2, activation='softmax')(op)
+      else:
+          output = Dense(config['vocab_size'], activation = 'softmax')(op)
 
       att_model = Model(inputs = input, outputs=output)
+      print(att_model.summary())
       return att_model
 
     def get_lr_range(self, total_epoch = 3, show_plot = True):
@@ -200,12 +215,13 @@ class Train():
 
       class attPlotsCallback(tf.keras.callbacks.Callback):
 
-          def __init__(self, log_dir, test_data, problem_id):
+          def __init__(self, log_dir, test_data, problem_id, seq_len):
 
 
               self.file_writer = tf.summary.create_file_writer(log_dir)
               self.test_data = test_data
               self.problem_id = problem_id
+              self.seq_len = seq_len
               self.images = None
 
 
@@ -231,10 +247,73 @@ class Train():
           def on_epoch_end(self, epoch, logs=None):
 
               """Runs metrics and histogram summaries at epoch end."""
+
+
+              def plot(axes, mat, data_point, problem_id, target=None):
+                axes.matshow(mat, cmap='viridis' )
+
+                #ax[i][j].matshow(att_scores[i][0][j], cmap='viridis')
+                if(problem_id == 1):
+                    axes.set_title('epoch {} layer {}, head {}'.format(epoch, i, j))
+                    axes.set_xticks(ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 3])
+                    axes.set_yticks(ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 3])
+                    axes.set_xticklabels([3,3])
+                    axes.set_yticklabels([3,3])
+                elif(problem_id == 2):
+                    axes.set_title('epoch {} layer {}, head {}'.format(epoch, i, j))
+                    x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 2]
+                    y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 2]
+                    axes.set_xticks(ticks = x_ticks)
+                    axes.set_yticks(ticks = y_ticks)
+                    axes.set_xticklabels([2 for i in x_ticks])
+                    axes.set_yticklabels([2 for i in y_ticks])
+                elif(problem_id == 3):
+                    axes.set_title('epoch {} layer {}, head {}'.format(epoch, i, j))
+                    #target = max(list(filter(lambda x: x!=27, data_point[0].numpy())))
+                    x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == target]
+                    y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == target]
+                    axes.set_xticks(ticks = x_ticks)
+                    axes.set_yticks(ticks = y_ticks)
+                    axes.set_xticklabels([target for i in x_ticks])
+                    axes.set_yticklabels([target for i in y_ticks])
+                elif(problem_id == 4):
+                    #print('here')
+                    axes.set_title('epoch {} layer {}, head {}'.format(epoch, i, j))
+                    x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 1]
+                    y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 1]
+                    #print(y_ticks)
+                    axes.set_xticks(ticks = [x_ticks[0],x_ticks[-1]])
+                    axes.set_yticks(ticks = [y_ticks[0], y_ticks[-1]])
+                    axes.set_xticklabels([1,1])
+                    axes.set_yticklabels([1,1])
+                elif(problem_id == 7 or problem_id == 8 or problem_id == 5 or problem_id == 6):
+                    #print('here')
+                    axes.set_title('epoch {} layer {}, head {}'.format(epoch, i, j))
+                    x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 0]
+                    y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 0]
+                    x_labels = [_ for i,_ in enumerate(data_point[0].numpy()) if _ != 0]
+                    #print(y_ticks)
+                    axes.set_xticks(ticks = x_ticks)
+                    axes.set_yticks(ticks = y_ticks)
+                    axes.set_xticklabels(x_labels)
+                    axes.set_yticklabels(x_labels)
+
+                elif(problem_id == 9):
+                    #print('here')
+                    axes.set_title('Inference Plots prob_id {}\n'.format(problem_id))
+                    x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 11]
+                    y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 11]
+                    x_labels = [_ for i,_ in enumerate(data_point[0].numpy()) if _ != 11]
+                    #print(y_ticks)
+                    axes.set_xticks(ticks = x_ticks)
+                    axes.set_yticks(ticks = y_ticks)
+                    axes.set_xticklabels(x_labels)
+                    axes.set_yticklabels(x_labels)
               data_point = None
 
               for batch in self.test_data:
                   data_point = batch[0][:1]
+                  target = batch[1].numpy()[0]
                   break
 
               _ , att_scores = self.model.layers[1](data_point)
@@ -242,20 +321,28 @@ class Train():
 
               fig, ax = plt.subplots(att_scores.shape[0], att_scores.shape[2], figsize=(16,16))
 
-              fig.figsize = (16*att_scores.shape[0], 16*att_scores.shape[2])
+              #fig.figsize = (16*att_scores.shape[0], 16*att_scores.shape[2])
 
-              if(self.problem_id == 1):
+              if(self.problem_id in [1,2,3,4,5,6,7,8,9]):
 
                   for i in range(att_scores.shape[0]):
                         for j in range(att_scores.shape[2]):
-                          ax[i][j].matshow(att_scores[i][0][j], cmap='viridis', )
-
-                          #ax[i][j].matshow(att_scores[i][0][j], cmap='viridis')
-                          ax[i][j].set_title('epoch {} layer {}, head {}'.format(epoch, i, j))
-                          ax[i][j].set_xticks(ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 3])
-                          ax[i][j].set_yticks(ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 3])
-                          ax[i][j].set_xticklabels([3,3])
-                          ax[i][j].set_yticklabels([3,3])
+                          if (att_scores.shape[0] > 1 and att_scores.shape[2] > 1):
+                              # ax[i][j].matshow(att_scores[i][0][j], cmap='viridis', )
+                              #
+                              # #ax[i][j].matshow(att_scores[i][0][j], cmap='viridis')
+                              # ax[i][j].set_title('epoch {} layer {}, head {}'.format(epoch, i, j))
+                              # ax[i][j].set_xticks(ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 3])
+                              # ax[i][j].set_yticks(ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 3])
+                              # ax[i][j].set_xticklabels([3,3])
+                              # ax[i][j].set_yticklabels([3,3])
+                              plot(ax[i][j], att_scores[i][0][j], data_point, self.problem_id, target)
+                          elif(att_scores.shape[0] == 1 and att_scores.shape[2] > 1):
+                              plot(ax[j], att_scores[i][0][j], data_point, self.problem_id, target)
+                          elif(att_scores.shape[0] > 1 and att_scores.shape[2] == 1):
+                              plot(ax[i], att_scores[i][0][j], data_point, self.problem_id, target)
+                          else:
+                              plot(ax, att_scores[i][0][j], data_point, self.problem_id, target)
 
                   if(self.images is not None):
                       self.images = tf.concat([self.images, self.plot_to_image(fig)], axis = 0)
@@ -263,10 +350,10 @@ class Train():
                       self.images = self.plot_to_image(fig)
 
 
-                  print(self.images.shape)
+                  #print(self.images.shape)
 
                   with self.file_writer.as_default():
-                    tf.summary.image("Training data", self.images, step=0)
+                    tf.summary.image("Training data", self.images, step=0, max_outputs = 500)
 
 
 
@@ -276,14 +363,20 @@ class Train():
       model = self.create_model()
 
       logdir = self.config['log_dir']
+      checkpoint_path = "training_1/cp.ckpt"
+      checkpoint_dir = os.path.dirname(checkpoint_path)
+
+      cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+                                                 save_weights_only=True,
+                                                 verbose=1)
       tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir = logdir, histogram_freq = 1)
-      att_plots = attPlotsCallback(logdir, self.test_dataset, self.problem_id)
+      att_plots = attPlotsCallback(logdir, self.test_dataset, self.problem_id, self.seq_len)
       file_writer = tf.summary.create_file_writer(logdir)
 
       self.optimizer.learning_rate = self.learning_rate
       model.compile(optimizer= self.optimizer, loss=self.loss_function, metrics = self.metric)
       history = model.fit(self.train_dataset, epochs = self.epochs, validation_data = self.test_dataset, steps_per_epoch = len(self.train_dataset), callbacks=[tensorboard_callback,
-                                                                                                                                              att_plots])
+                                                                                                                                              att_plots, cp_callback])
 
       return model, history
 
@@ -302,18 +395,107 @@ class Test():
 
     '''
 
-    def __init__(self, data_point, model):
+    def __init__(self, model, test_dataset, problem_id, seq_len):
 
         ''' Initializes the variables '''
 
         self.model = model
-        self.data_point = data_point
+        self.test_dataset = test_dataset
+        self.problem_id = problem_id
+        self.seq_len = seq_len
 
     def infer(self):
 
         ''' Gives prediction for the data points given by model '''
 
         return self.model(self.data_point)
+
+    def scatter_plot(self):
+
+        predictions = []
+        actual = []
+        for b in self.test_dataset:
+            predictions.append(self.model.predict(b[0]))
+            actual.append(b[1])
+        predictions = tf.convert_to_tensor(predictions, dtype='float32')
+        actual = tf.convert_to_tensor(actual, dtype='float32')
+
+        predictions = tf.reshape(tf.squeeze(predictions), (tf.shape(predictions)[0]*tf.shape(predictions)[1],))
+        actual = tf.reshape(actual, tf.shape(actual)[0]*tf.shape(actual)[1])
+
+        plt.scatter(actual, predictions)
+        plt.xlabel('Actual')
+        plt.ylabel('Predictions')
+        plt.legend()
+        plt.savefig('scatter_plot.png')
+
+
+    def infer(self):
+
+        '''Inferences the model for 5 random test points'''
+
+
+    def plot(self, axes, mat, data_point, problem_id, target=None):
+        axes.matshow(mat, cmap='viridis' )
+
+        #ax[i][j].matshow(att_scores[i][0][j], cmap='viridis')
+        if(problem_id == 1):
+            axes.set_title('Inference Plots prob_id {}'.format(problem_id))
+            axes.set_xticks(ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 3])
+            axes.set_yticks(ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 3])
+            axes.set_xticklabels([3,3])
+            axes.set_yticklabels([3,3])
+        elif(problem_id == 2):
+            axes.set_title('Inference Plots prob_id {}'.format(problem_id))
+            x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 2]
+            y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 2]
+            axes.set_xticks(ticks = x_ticks)
+            axes.set_yticks(ticks = y_ticks)
+            axes.set_xticklabels([2 for i in x_ticks])
+            axes.set_yticklabels([2 for i in y_ticks])
+        elif(problem_id == 3):
+            axes.set_title('Inference Plots prob_id {}\n'.format(problem_id))
+            #target = max(list(filter(lambda x: x!=27, data_point[0].numpy())))
+            x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == target]
+            y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == target]
+            axes.set_xticks(ticks = x_ticks)
+            axes.set_yticks(ticks = y_ticks)
+            axes.set_xticklabels([target for i in x_ticks])
+            axes.set_yticklabels([target for i in y_ticks])
+        elif(problem_id == 4):
+            #print('here')
+            axes.set_title('Inference Plots prob_id {}\n'.format(problem_id))
+            x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 1]
+            y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 1]
+            #print(y_ticks)
+            axes.set_xticks(ticks = [x_ticks[0],x_ticks[-1]])
+            axes.set_yticks(ticks = [y_ticks[0], y_ticks[-1]])
+            axes.set_xticklabels([1,1])
+            axes.set_yticklabels([1,1])
+
+        elif(problem_id == 7 or problem_id == 8 or problem_id == 5 or problem_id == 6):
+            #print('here')
+            axes.set_title('Inference Plots prob_id {}\n'.format(problem_id))
+            x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 0]
+            y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 0]
+            x_labels = [_ for i,_ in enumerate(data_point[0].numpy()) if _ != 0]
+            #print(y_ticks)
+            axes.set_xticks(ticks = x_ticks)
+            axes.set_yticks(ticks = y_ticks)
+            axes.set_xticklabels(x_labels)
+            axes.set_yticklabels(x_labels)
+
+        elif(problem_id == 9):
+            #print('here')
+            axes.set_title('Inference Plots prob_id {}\n'.format(problem_id))
+            x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 11]
+            y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 11]
+            x_labels = [_ for i,_ in enumerate(data_point[0].numpy()) if _ != 11]
+            #print(y_ticks)
+            axes.set_xticks(ticks = x_ticks)
+            axes.set_yticks(ticks = y_ticks)
+            axes.set_xticklabels(x_labels)
+            axes.set_yticklabels(x_labels)
 
     def attention_plots(self, layer=0, input_index=0):
         '''
@@ -326,23 +508,47 @@ class Test():
         '''
 
 
-        _ , att_scores = self.model.layers[1](self.data_point)
+        data_point = None
+        for b in self.test_dataset:
+            #print(b)
+            num_points = len(b[0])
+            ind = random.randint(0,num_points-1)
+            data_point = b[0][ind]
+            target = b[1].numpy()[ind]
+            #print(data_point)
+            break
 
-        layer_att_scores = att_scores[layer]
+        #print(self.model.layers)
+
+        prediction = self.model(tf.expand_dims(data_point, axis=0))
+        _ , att_scores = self.model.layers[1](tf.expand_dims(data_point, axis=0))
+        #print(att_scores)
+        if(self.problem_id in [1,2,4,7]):
+            print(f'Prediction: {prediction}')
+        else:
+            print(f'Prediction: {np.argmax(prediction[0])}')
+        layer_att_scores = att_scores[-1]
         input_att_scores = layer_att_scores[input_index]
         num_heads = input_att_scores.shape[0]
+        fig, ax = plt.subplots(1, num_heads, figsize=(16,16))
+        # plt.show()
+        #print(num_heads)
+        #print(ax)
+        if(num_heads > 1):
+            for index,axes in enumerate(ax):
+              head_att_score = input_att_scores[index]
 
-        for head in range(num_heads):
-          head_att_score = input_att_scores[head]
-          fig = plt.figure(figsize=(16, 8))
 
-          ax = fig.add_subplot(2, 4, head+1)
-          #ax.matshow(head_att_score, cmap='viridis')
-          sns.heatmap(head_att_score, cmap='PiYG')
-          ax.set_xlabel('head {}'.format(head))
+              # ax = fig.add_subplot(2, 4, head+1)
+              #ax.matshow(head_att_score, cmap='viridis')
+              self.plot(axes, head_att_score, tf.expand_dims(data_point, axis=0), self.problem_id, target)
+        else:
+            self.plot(ax, input_att_scores[0], tf.expand_dims(data_point, axis=0), self.problem_id, target)
 
-        plt.tight_layout()
-        plt.show()
+        plt.savefig('infer.png')
+
+        #plt.tight_layout()
+
 
 
 
@@ -352,11 +558,65 @@ class Test():
 
 def _train(args):
 
-    dataset_ob = dataset.DistanceDataset()
-    train_dataset, test_dataset = dataset_ob.gen_data()
 
-    train_ob = Train(args, train_dataset, test_dataset, 64)
-    model, history = train_ob.train_model()
+    print(f"Training/Inference for problem id {args.problem_id}")
+    if(args.problem_id == 1):
+        dataset_ob = dataset.DistanceDataset()
+        train_dataset, test_dataset = dataset_ob.gen_data()
+
+    elif(args.problem_id == 2):
+
+        dataset_ob = dataset.CountRedTokenDataset(max_seq_length=args.seq_length)
+        train_dataset, test_dataset = dataset_ob.gen_data()
+
+    elif(args.problem_id == 3):
+        vocab = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
+        dataset_ob = dataset.MaxTokenDataset(vocab = vocab, max_seq_length=args.seq_length)
+        train_dataset, test_dataset = dataset_ob.gen_data()
+
+    elif(args.problem_id == 4):
+        dataset_ob = dataset.SeqLenDataset()
+        train_dataset, test_dataset = dataset_ob.gen_data()
+
+    elif(args.problem_id == 5):
+        vocab = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
+        dataset_ob = dataset.PalindromeDataset(vocab=vocab, max_seq_length=args.seq_length)
+        train_dataset, test_dataset = dataset_ob.gen_data()
+
+    elif(args.problem_id == 6):
+        vocab = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
+        dataset_ob = dataset.SortedDataset(vocab=vocab,max_seq_length=args.seq_length)
+        train_dataset, test_dataset = dataset_ob.gen_data()
+
+    elif(args.problem_id == 7):
+        vocab = list(range(10))
+        dataset_ob = dataset.SumDataset(vocab=vocab, max_seq_length = args.seq_length)
+        train_dataset, test_dataset = dataset_ob.gen_data()
+
+    elif(args.problem_id == 8):
+        vocab = list(range(10))
+        dataset_ob = dataset.MaxDataset(vocab=vocab, max_seq_length = args.seq_length)
+        train_dataset, test_dataset = dataset_ob.gen_data()
+
+    elif(args.problem_id == 9):
+        vocab = list(range(10))
+        dataset_ob = dataset.MinDataset(vocab=vocab, max_seq_length = args.seq_length)
+        train_dataset, test_dataset = dataset_ob.gen_data()
+
+
+
+    if(args.training == 'true'):
+        train_ob = Train(args, train_dataset, test_dataset, 64)
+        model, history = train_ob.train_model()
+    else:
+        checkpoint_path = "training_" + str(1)+ "/cp.ckpt"
+        train_ob = Train(args, train_dataset, test_dataset, 64)
+        model = train_ob.create_model()
+        model.load_weights(checkpoint_path)
+        test_ob = Test(model, test_dataset, args.problem_id, args.seq_length)
+        test_ob.attention_plots()
+
+
 
 
     # input_shape = (args.seq_length)
@@ -398,6 +658,7 @@ if __name__ == '__main__':
     parser.add_argument('--metric', type=str, default='mean_squared_error', help='Which metric to use for training')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='Which learning rate to use for training')
     parser.add_argument('--epochs', type=int, default=15, help='Number of epochs to run for training')
+    parser.add_argument('--training', type=str, default='true', help='flag to train the model')
     args = parser.parse_args()
 
     _train(args)

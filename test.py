@@ -2,6 +2,7 @@ import unittest
 import random
 import dataset
 import tensorflow as tf
+tf.get_logger().setLevel('ERROR')
 from collections import defaultdict
 import logging
 import sys
@@ -9,6 +10,8 @@ from tqdm import tqdm
 import model
 from tensorflow.keras.layers import Dense, Input
 from tensorflow.keras.models import Model
+import warnings
+warnings.filterwarnings("ignore")
 
 logger = logging.getLogger('')
 logger.setLevel(logging.DEBUG)

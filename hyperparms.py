@@ -1,6 +1,8 @@
 import sys
 import logging
 from datetime import datetime
+import warnings
+warnings.filterwarnings("ignore")
 
 logger = logging.getLogger('')
 logger.setLevel(logging.DEBUG)
@@ -9,7 +11,8 @@ sh = logging.StreamHandler(sys.stdout)
 formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
 sh.setFormatter(formatter)
 logger.addHandler(sh)
-
+logging.getLogger('matplotlib.font_manager').disabled = True
+logging.getLogger('matplotlib').setLevel(level=logging.CRITICAL)
 
 
 class Config:
