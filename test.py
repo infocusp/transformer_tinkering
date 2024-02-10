@@ -1,18 +1,23 @@
+'''Tests to test created dataset and model.'''
+
 import unittest
 import random
 import dataset
 import tensorflow as tf
-tf.get_logger().setLevel('ERROR')
 from collections import defaultdict
 import logging
 import sys
-from tqdm import tqdm
+import warnings
 import model
+
+
+from tqdm import tqdm
 from tensorflow.keras.layers import Dense, Input
 from tensorflow.keras.models import Model
-import warnings
+
 warnings.filterwarnings("ignore")
 
+tf.get_logger().setLevel('ERROR')
 logger = logging.getLogger('')
 logger.setLevel(logging.DEBUG)
 
@@ -20,11 +25,6 @@ sh = logging.StreamHandler(sys.stdout)
 formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
 sh.setFormatter(formatter)
 logger.addHandler(sh)
-
-
-
-
-
 
 class testDistanceDataset(unittest.TestCase):
 
