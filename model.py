@@ -1,9 +1,14 @@
-from tensorflow.keras.layers import Embedding, Dense, Input
+'''Implementation of a Transformer model.
+Note: For the experiments we do not use non-linearity on attention output.
+'''
+
 import tensorflow as tf
-tf.get_logger().setLevel('ERROR')
+from tensorflow.keras.layers import Embedding, Dense, Input
 import numpy as np
 import math
 import warnings
+
+tf.get_logger().setLevel('ERROR')
 warnings.filterwarnings("ignore")
 
 class Encodings(tf.keras.layers.Layer):
@@ -40,10 +45,6 @@ class Encodings(tf.keras.layers.Layer):
     self.sin_pos_embedding_mat = self.get_sin_pos_emb_mat(self.seq_length, self.embedding_dim)
     self.sinusodial_pos_embedding = Embedding(self.seq_length + 1, self.embedding_dim, weights = [self.sin_pos_embedding_mat], trainable= False)
 
-
-
-
-
   def get_sin_pos_emb_mat(self, seq_len, d, n = 10000):
 
     '''
@@ -58,19 +59,11 @@ class Encodings(tf.keras.layers.Layer):
         P[k, 2*i + 1] = np.cos(k/denominator)
     return P
 
-  # def build(self, input_shape):
-  #   batch_size = 64
-  #   self.class_tokens = Embedding(batch_size, self.embedding_dim)
-  #   self.class_tokens = self.class_tokens(tf.range(start=0, limit=batch_size, delta=1))
-
-
   def call(self, batch):
 
     '''Performs transformations on our given batch of data'''
 
-    #print(batch)
     embedding_out = self.embedding(batch)
-    #print(embedding_out)
     embedding_out *= tf.math.sqrt(tf.cast(self.embedding_dim, tf.float32))
 
     if(self.pos_embedding_flag and self.embedding_type == 'SIN_COS'):
@@ -82,8 +75,6 @@ class Encodings(tf.keras.layers.Layer):
 
 
     return embedding_out
-
-
 
 class Attention(tf.keras.layers.Layer):
 
@@ -118,11 +109,6 @@ class Attention(tf.keras.layers.Layer):
     self.key = Dense(self.all_head_size)
     self.value = Dense(self.all_head_size)
     self.out = Dense(emb_dim)
-    # self.wq = [tf.keras.layers.Dense(self.attention_head_size) for _ in range(self.num_att_heads)]
-    # self.wk = [tf.keras.layers.Dense(self.attention_head_size) for _ in range(self.num_att_heads)]
-    # self.wv = [tf.keras.layers.Dense(self.attention_head_size) for _ in range(self.num_att_heads)]
-    # self.wo = tf.keras.layers.Dense(self.all_head_size)
-
 
   def split_heads(self, input_layer, hidden_states_shape):
 
@@ -134,37 +120,6 @@ class Attention(tf.keras.layers.Layer):
                                  self.attention_head_size)
                                  ), perm=[0,2,1,3])
 
-
-
-  # def call(self, hidden_states):
-  #   # query has shape (batch, query_len, model_size)
-  #   # value has shape (batch, value_len, model_size)
-  #   heads = []
-  #   att_scores = []
-  #   hidden_states_shape = tf.shape(hidden_states)
-  #   for i in range(self.num_att_heads):
-  #     score = tf.matmul(self.wq[i](hidden_states), self.wk[i](hidden_states), transpose_b=True)
-  #
-  #     # Here we scale the score as described in the paper
-  #     score /= tf.math.sqrt(tf.dtypes.cast(self.attention_head_size, tf.float32))
-  #     # score has shape (batch, query_len, value_len)
-  #
-  #     alignment = tf.nn.softmax(score, axis=2)
-  #     # alignment has shape (batch, query_len, value_len)
-  #
-  #     att_scores.append(alignment)
-  #
-  #     head = tf.matmul(alignment, self.wv[i](hidden_states))
-  #     # head has shape (batch, decoder_len, value_size)
-  #     heads.append(head)
-  #
-  #   # Concatenate all the attention heads
-  #   # so that the last dimension summed up to model_size
-  #   heads = tf.concat(heads, axis=2)
-  #   heads = self.wo(heads)
-  #   # heads has shape (batch, query_len, model_size)
-  #   return heads, tf.transpose(tf.convert_to_tensor(att_scores, dtype='float32'), perm=[1,0,2,3])
-
   def call(self, hidden_states):
 
     '''Performs transformations on input batch to get our attention scores and output'''
@@ -173,52 +128,25 @@ class Attention(tf.keras.layers.Layer):
     mixed_query_layer = self.query(hidden_states)
     mixed_key_layer = self.key(hidden_states)
     mixed_value_layer = self.value(hidden_states)
-
     hidden_states_shape = tf.shape(hidden_states)
 
-
     #Dividing query keay and value vectors between given number of attention heads
-    # query_layer = tf.reshape(mixed_query_layer, shape = (hidden_states_shape[0], self.num_att_heads,
-    #                              hidden_states_shape[1],
-    #                              self.attention_head_size))
-
-
-    # key_layer = tf.reshape(mixed_key_layer, shape = (hidden_states_shape[0], self.num_att_heads,
-    #                              hidden_states_shape[1],
-    #                              self.attention_head_size))
-
-    # value_layer = tf.reshape(mixed_value_layer, shape = (hidden_states_shape[0], self.num_att_heads,
-    #                              hidden_states_shape[1],
-    #                              self.attention_head_size))
-
     query_layer = self.split_heads(mixed_query_layer, hidden_states_shape)
-
     key_layer = self.split_heads(mixed_key_layer, hidden_states_shape)
-
     value_layer = self.split_heads(mixed_value_layer, hidden_states_shape)
-
-
 
     #getting the attention scores
     attention_scores = tf.matmul(query_layer, key_layer, transpose_b=True)
-
     attention_scores = attention_scores / math.sqrt(self.attention_head_size)
-
     attention_probs = tf.nn.softmax(attention_scores, axis=-1)
 
     #getting the attention output
     context_layer = tf.transpose(tf.matmul(attention_probs, value_layer),perm=[0,2,1,3])
-
     context_layer = tf.reshape(context_layer, shape=( hidden_states_shape[0],
                                                          -1,
                                                          self.emb_dim))
-
     att_output = self.out(context_layer)
-
     return att_output, attention_probs
-
-
-
 
 class _Model(tf.keras.layers.Layer):
 
@@ -256,13 +184,11 @@ class _Model(tf.keras.layers.Layer):
     self.num_att_layers = num_att_layers
     self.head = Dense(self.head_dim)
 
-
   def build(self, input_shape):
 
     self.att_layers = []
     for i in range(self.num_att_layers):
       self.att_layers.append(Attention(self.num_heads, self.emb_dim))
-
 
   def call(self, input):
 
@@ -275,15 +201,10 @@ class _Model(tf.keras.layers.Layer):
     for i in range(self.num_att_layers):
       att_op, att_scores = self.att_layers[i](att_op)
       att_scores_list.append(att_scores)
-
-
     if(self.agg_method == 'TOKEN'):
-      #op = att_op[:,0,:]
       op = tf.gather(att_op, 0, axis=1)
     else:
-      #op = tf.math.reduce_sum(att_op[:, 1:, :], axis = 1)
       op = tf.reduce_sum(att_op, axis=1)
-
     op = self.head(op)
 
 
