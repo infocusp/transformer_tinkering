@@ -1,7 +1,10 @@
+'''Configuration file for hyperparameters.'''
+
 import sys
 import logging
 from datetime import datetime
 import warnings
+
 warnings.filterwarnings("ignore")
 
 logger = logging.getLogger('')

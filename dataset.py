@@ -1,3 +1,17 @@
+'''Script to create dataset based on our problem description.
+Mapping of the dataset description with problem id is shown below:
+
+Distance between 2 red tokens: 1
+Count number of red tokens: 2
+Find token that appears maximum time: 3
+Compute sequence length: 4
+Palindrome Sequence: 5
+Sorted Sequence: 6
+Sum: 7
+MAx: 8
+Min: 9
+'''
+
 import random
 from random import sample
 from tqdm.auto import tqdm
@@ -5,7 +19,6 @@ import pandas as pd
 from collections import defaultdict
 import numpy as np
 import tensorflow as tf
-tf.get_logger().setLevel('ERROR')
 import itertools
 import math
 import time
@@ -13,6 +26,8 @@ import hyperparms
 import sys
 import logging
 import warnings
+
+tf.get_logger().setLevel('ERROR')
 warnings.filterwarnings("ignore")
 
 logger = logging.getLogger('')
@@ -25,18 +40,6 @@ logger.addHandler(sh)
 logging.getLogger('matplotlib.font_manager').disabled = True
 logging.getLogger('matplotlib').setLevel(level=logging.CRITICAL)
 
-'''
-Distance between 2 red tokens: 1
-Count number of red tokens: 2
-Find token that appears maximum time: 3
-Compute sequence length: 4
-Palindrome Sequence: 5
-Sorted Sequence: 6
-Sum: 7
-MAx: 8
-Min: 9
-
-'''
 class Dataset:
 
     '''
@@ -117,26 +120,13 @@ class Dataset:
 
         '''filling current i token in place of maximum # of 1 or 0 in the binary epresentation of i'''
 
-
         b = format(i,'b')
         num_one = len([1 for char in b if char == '1'])
         num_zero = len([1 for char in b if char == '0'])
-
         if(num_zero > num_one):
-          #point = [self.vocab[i%len(self.vocab)] if char == '0' else self.vocab[((self.max_seq_length - len(b)) + index)%len(self.vocab)] for index,char in enumerate(b)]
           point = [i%len(self.vocab) if char == '0' else ((self.max_seq_length - len(b)) + index)%len(self.vocab) for index,char in enumerate(b)]
-
         else:
-          #point = [self.vocab[i%len(self.vocab)] if char == '1' else self.vocab[((self.max_seq_length - len(b)) + index)%len(self.vocab)] for index,char in enumerate(b)]
           point = [i%len(self.vocab) if char == '1' else ((self.max_seq_length - len(b)) + index)%len(self.vocab) for index,char in enumerate(b)]
-
-
-        # rem_tokens = self.max_seq_length - len(point)
-        #
-        # while(rem_tokens):
-        #     point += '%'
-        #     rem_tokens -= 1
-
         return tf.convert_to_tensor(point)
 
 
@@ -145,10 +135,7 @@ class Dataset:
         '''Creates data for problem 3'''
 
         sequence = tf.py_function(self.make_data, [i], tf.int32)
-        #label = tf.gather(self.vocab, i%len(self.vocab))
-        #label = tf.one_hot([(i%len(self.vocab))], depth=len(self.vocab))[0]
         label = tf.convert_to_tensor((i%len(self.vocab)))
-        #sequence = tf.add(sequence, 1)
         sequence = tf.concat([[26], sequence], axis=0)
         return sequence,label
 
@@ -170,31 +157,23 @@ class Dataset:
           b = '0'*(self.max_seq_length - len(b)) + b
           indices = [index%len(self.vocab) for index,char in enumerate(b) if char == '1']
           if(l_b %2 == 0):
-            #point = [self.vocab[i] for i in indices] + [self.vocab[i] for i in indices[: : -1]]
             point = indices + indices[: : -1]
-
           else:
-            #point = [self.vocab[i] for i in indices] + [self.vocab[l_b]] + [self.vocab[i] for i in indices[: : -1]]
             point = indices + [l_b] + indices[: : -1]
       else:
           b = format(i,'b')
           l_b = len(b)
           b = '0'*(self.max_seq_length - len(b)) + b
           indices = [index%len(self.vocab) for index,char in enumerate(b) if char == '1']
-          #point = [self.vocab[i] for i in indices] + [self.vocab[i] for i in [x*(x+4)%len(self.vocab) for x in indices]]
           point = [i for i in indices] + [i for i in [x*(x+4)%len(self.vocab) for x in indices]]
-
-      # return tf.convert_to_tensor(point,'string')
       return tf.convert_to_tensor(point,'int64')
 
     def gen_data_pali(self, i):
 
         '''Generates data for palindrome data'''
 
-        # sequence = tf.py_function(self.make_palindrome, [i], 'string')
         sequence = tf.py_function(self.make_palindrome, [i], 'int64')
         sequence = tf.concat([[27], sequence], axis=0)
-
         if(i %2 == 0):
           label = 1
         else:
@@ -217,14 +196,9 @@ class Dataset:
       for i in range(elem):
         a = len([1 for char in format(start,'b') if char == '0'])
         s = len([1 for char in format(start, 'b') if char == '1'])
-
         c = s+a
-
-
         next = (a*num[-1] + c) % m
-
         if(j % 2 == 0):
-
           #preparing sort data
           if(next >= num[-1]):
             num.append(next)
@@ -232,21 +206,17 @@ class Dataset:
             start = num[-1]
           else:
             start = next
-
         else:
             #prepraing unsort data
             num.append(next)
             start = num[-1]
 
-      # return tf.convert_to_tensor(list(map(lambda x: self.vocab[x] ,num)), 'string')
       return tf.convert_to_tensor(list(map(lambda x: x ,num)), tf.int64)
 
     def gen_sort_data(self, i):
 
         sequence = tf.py_function(self.make_sort_data, [i], tf.int64)
         sequence = tf.concat([[27],sequence], axis=0)
-
-
         if(i %2 == 0):
           label = 1
         else:
@@ -271,8 +241,6 @@ class Dataset:
     def gen_data_mms(self, i):
 
       sequence = tf.py_function(self.make_number_data, [i], 'int64')
-
-
       if(self.__class__.__name__ == 'SumDataset'):
         label = tf.reduce_sum(sequence)
         sequence = tf.concat([[10], sequence], axis=0)
@@ -280,8 +248,6 @@ class Dataset:
         label = tf.reduce_max(sequence)
         sequence = tf.concat([[10], sequence], axis=0)
       else:
-        #sequence = tf.convert_to_tensor([11 if t == 0 else t for t in sequence.numpy()],'int64')
-        #sequence = [index%len(self.vocab) if char == '1' else 0 for index,char in enumerate('0'*(self.max_seq_length - len(format(int(i),'b'))) + format(int(i),'b'))]
         label = tf.reduce_min(sequence)
         sequence = tf.concat([[10], sequence], axis=0)
 
@@ -318,13 +284,7 @@ class DistanceDataset(Dataset):
     def gen_data(self):
 
         '''This method generates the data for our problem'''
-
-        #logger.info('**************GENERATING DATA FOR PROBLEM 1 *************\n')
-
         indices = [[i, j] for i in range(self.max_seq_length) for j in range(i+1, self.max_seq_length)]
-
-        #sequence, label = self.create_sequence_and_lables(indices, 'TOKEN', self.max_seq_length)
-
         dataset = tf.data.Dataset.from_tensor_slices(indices)
         dataset = dataset.shuffle(buffer_size=len(indices), reshuffle_each_iteration=False)
         dataset = dataset.map(self.create_sequence_and_lables)
@@ -366,8 +326,6 @@ class CountRedTokenDataset(Dataset):
     def gen_data(self):
 
         '''This method generates the data for our problem'''
-
-        #logger.info('**************GENERATING DATA FOR PROBLEM 2 *************\n')
 
         dataset = tf.data.Dataset.from_tensor_slices(tf.range(self.number_data_points))
         dataset = dataset.shuffle(buffer_size=self.number_data_points, reshuffle_each_iteration=False)
@@ -412,9 +370,6 @@ class MaxTokenDataset(Dataset):
     def gen_data(self):
 
       '''generates data for problem 3'''
-
-      #logger.info('**************GENERATING DATA FOR PROBLEM 3 *************\n')
-
       dataset = tf.data.Dataset.from_tensor_slices(tf.range(self.number_data_points))
 
       dataset = dataset.map(self._gen_data, num_parallel_calls=tf.data.AUTOTUNE)
@@ -461,9 +416,6 @@ class SeqLenDataset(Dataset):
     def gen_data(self):
 
       '''generates data for problem 3'''
-
-      #logger.info('**************GENERATING DATA FOR PROBLEM 4 *************\n')
-
       indices = [[0, j] for j in range(1, self.max_seq_length)]
 
       dataset = tf.data.Dataset.from_tensor_slices(indices)
@@ -511,12 +463,8 @@ class PalindromeDataset(Dataset):
     def gen_data(self):
 
         '''Generates data'''
-
-        #logger.info('**************GENERATING DATA FOR PROBLEM 5 *************\n')
-
-
         dataset = tf.data.Dataset.from_tensor_slices(tf.range(1,self.number_data_points))
-        dataset = dataset.map(self.gen_data_pali, num_parallel_calls=tf.data.AUTOTUNE)
+        dataset = dataset.map(self.gen_data_pali)
         dataset = dataset.shuffle(buffer_size=self.number_data_points, reshuffle_each_iteration=False)
 
         train_size = int(0.8 * self.number_data_points)
@@ -541,10 +489,6 @@ class SortedDataset(Dataset):
         number_of_data_points: maximum number of datapoints to be generated in case where there are exponential order data points possible
 
     '''
-
-
-
-
     def __init__(self, vocab, max_seq_length = 512, number_data_points = 100000):
 
         '''Initializes our variables'''
@@ -555,17 +499,13 @@ class SortedDataset(Dataset):
         self.max_seq_length = max_seq_length
         self.number_data_points = number_data_points
 
-
     def gen_data(self):
 
           '''Generates data'''
 
-          #logger.info('**************GENERATING DATA FOR PROBLEM 6 *************\n')
-
-
           dataset = tf.data.Dataset.from_tensor_slices(tf.range(self.number_data_points))
 
-          dataset = dataset.map(self.gen_sort_data, num_parallel_calls=tf.data.AUTOTUNE)
+          dataset = dataset.map(self.gen_sort_data)
 
           dataset = dataset.shuffle(buffer_size=self.number_data_points, reshuffle_each_iteration=False)
 

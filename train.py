@@ -1,42 +1,30 @@
-from tensorflow.keras.layers import Dense, Input
-from tensorflow.keras.models import Model
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras import backend as K
+'''Training script which can be used to train the model for the problems.'''
+
+import tensorflow as tf
 import os
 import random
-from PIL import Image
-
-
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-import tensorflow as tf
-tf.get_logger().setLevel('ERROR')
 import matplotlib.pyplot as plt
-from tensorflow.keras.callbacks import  ReduceLROnPlateau
 import numpy as np
 import hyperparms
 import dataset
 import model
 import argparse
 import seaborn as sns
-from datetime import datetime
 import io
 import warnings
+
+from datetime import datetime
+from tensorflow.keras.layers import Dense, Input
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import backend as K
+from tensorflow.keras.callbacks import  ReduceLROnPlateau
+from PIL import Image
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+tf.get_logger().setLevel('ERROR')
 warnings.filterwarnings("ignore")
 tf.autograph.set_verbosity(1)
-
-
-
-# input_shape = (512)
-# config = hyperparams.Config()
-# input = Input(input_shape)
-# op, att_scores = model._Model(config)(input)
-# output = Dense(1, activation='linear')(op)
-#
-# _model = Model(inputs = input, outputs=output)
-#
-# _model.summary()
-import io
-
 
 class Train():
 
@@ -184,9 +172,6 @@ class Train():
                 new_lr = K.get_value(self.model.optimizer.lr)*LRmult
                 '''setting new lr for our next batch'''
                 K.set_value(self.model.optimizer.lr, new_lr)
-                #print('lr:',K.get_value(self.model.optimizer.lr))
-
-
 
         lr_callback = LrCallback(self.train_dataset, self.batch_size)
 
@@ -251,8 +236,6 @@ class Train():
 
               def plot(axes, mat, data_point, problem_id, target=None):
                 axes.matshow(mat, cmap='viridis' )
-
-                #ax[i][j].matshow(att_scores[i][0][j], cmap='viridis')
                 if(problem_id == 1):
                     axes.set_title('epoch {} layer {}, head {}'.format(epoch, i, j))
                     axes.set_xticks(ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 3])
@@ -269,7 +252,6 @@ class Train():
                     axes.set_yticklabels([2 for i in y_ticks])
                 elif(problem_id == 3):
                     axes.set_title('epoch {} layer {}, head {}'.format(epoch, i, j))
-                    #target = max(list(filter(lambda x: x!=27, data_point[0].numpy())))
                     x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == target]
                     y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == target]
                     axes.set_xticks(ticks = x_ticks)
@@ -277,65 +259,43 @@ class Train():
                     axes.set_xticklabels([target for i in x_ticks])
                     axes.set_yticklabels([target for i in y_ticks])
                 elif(problem_id == 4):
-                    #print('here')
                     axes.set_title('epoch {} layer {}, head {}'.format(epoch, i, j))
                     x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 1]
                     y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 1]
-                    #print(y_ticks)
                     axes.set_xticks(ticks = [x_ticks[0],x_ticks[-1]])
                     axes.set_yticks(ticks = [y_ticks[0], y_ticks[-1]])
                     axes.set_xticklabels([1,1])
                     axes.set_yticklabels([1,1])
                 elif(problem_id == 7 or problem_id == 8 or problem_id == 5 or problem_id == 6):
-                    #print('here')
                     axes.set_title('epoch {} layer {}, head {}'.format(epoch, i, j))
                     x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 0]
                     y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 0]
                     x_labels = [_ for i,_ in enumerate(data_point[0].numpy()) if _ != 0]
-                    #print(y_ticks)
                     axes.set_xticks(ticks = x_ticks)
                     axes.set_yticks(ticks = y_ticks)
                     axes.set_xticklabels(x_labels)
                     axes.set_yticklabels(x_labels)
-
                 elif(problem_id == 9):
-                    #print('here')
                     axes.set_title('Inference Plots prob_id {}\n'.format(problem_id))
                     x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 11]
                     y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 11]
                     x_labels = [_ for i,_ in enumerate(data_point[0].numpy()) if _ != 11]
-                    #print(y_ticks)
                     axes.set_xticks(ticks = x_ticks)
                     axes.set_yticks(ticks = y_ticks)
                     axes.set_xticklabels(x_labels)
                     axes.set_yticklabels(x_labels)
               data_point = None
-
               for batch in self.test_data:
                   data_point = batch[0][:1]
                   target = batch[1].numpy()[0]
                   break
-
               _ , att_scores = self.model.layers[1](data_point)
               index = 0
-
               fig, ax = plt.subplots(att_scores.shape[0], att_scores.shape[2], figsize=(16,16))
-
-              #fig.figsize = (16*att_scores.shape[0], 16*att_scores.shape[2])
-
               if(self.problem_id in [1,2,3,4,5,6,7,8,9]):
-
                   for i in range(att_scores.shape[0]):
                         for j in range(att_scores.shape[2]):
                           if (att_scores.shape[0] > 1 and att_scores.shape[2] > 1):
-                              # ax[i][j].matshow(att_scores[i][0][j], cmap='viridis', )
-                              #
-                              # #ax[i][j].matshow(att_scores[i][0][j], cmap='viridis')
-                              # ax[i][j].set_title('epoch {} layer {}, head {}'.format(epoch, i, j))
-                              # ax[i][j].set_xticks(ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 3])
-                              # ax[i][j].set_yticks(ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 3])
-                              # ax[i][j].set_xticklabels([3,3])
-                              # ax[i][j].set_yticklabels([3,3])
                               plot(ax[i][j], att_scores[i][0][j], data_point, self.problem_id, target)
                           elif(att_scores.shape[0] == 1 and att_scores.shape[2] > 1):
                               plot(ax[j], att_scores[i][0][j], data_point, self.problem_id, target)
@@ -348,10 +308,6 @@ class Train():
                       self.images = tf.concat([self.images, self.plot_to_image(fig)], axis = 0)
                   else:
                       self.images = self.plot_to_image(fig)
-
-
-                  #print(self.images.shape)
-
                   with self.file_writer.as_default():
                     tf.summary.image("Training data", self.images, step=0, max_outputs = 500)
 
@@ -429,16 +385,8 @@ class Test():
         plt.legend()
         plt.savefig('scatter_plot.png')
 
-
-    def infer(self):
-
-        '''Inferences the model for 5 random test points'''
-
-
     def plot(self, axes, mat, data_point, problem_id, target=None):
         axes.matshow(mat, cmap='viridis' )
-
-        #ax[i][j].matshow(att_scores[i][0][j], cmap='viridis')
         if(problem_id == 1):
             axes.set_title('Inference Plots prob_id {}'.format(problem_id))
             axes.set_xticks(ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 3])
@@ -455,7 +403,6 @@ class Test():
             axes.set_yticklabels([2 for i in y_ticks])
         elif(problem_id == 3):
             axes.set_title('Inference Plots prob_id {}\n'.format(problem_id))
-            #target = max(list(filter(lambda x: x!=27, data_point[0].numpy())))
             x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == target]
             y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == target]
             axes.set_xticks(ticks = x_ticks)
@@ -463,35 +410,29 @@ class Test():
             axes.set_xticklabels([target for i in x_ticks])
             axes.set_yticklabels([target for i in y_ticks])
         elif(problem_id == 4):
-            #print('here')
             axes.set_title('Inference Plots prob_id {}\n'.format(problem_id))
             x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 1]
             y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ == 1]
-            #print(y_ticks)
             axes.set_xticks(ticks = [x_ticks[0],x_ticks[-1]])
             axes.set_yticks(ticks = [y_ticks[0], y_ticks[-1]])
             axes.set_xticklabels([1,1])
             axes.set_yticklabels([1,1])
 
         elif(problem_id == 7 or problem_id == 8 or problem_id == 5 or problem_id == 6):
-            #print('here')
             axes.set_title('Inference Plots prob_id {}\n'.format(problem_id))
             x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 0]
             y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 0]
             x_labels = [_ for i,_ in enumerate(data_point[0].numpy()) if _ != 0]
-            #print(y_ticks)
             axes.set_xticks(ticks = x_ticks)
             axes.set_yticks(ticks = y_ticks)
             axes.set_xticklabels(x_labels)
             axes.set_yticklabels(x_labels)
 
         elif(problem_id == 9):
-            #print('here')
             axes.set_title('Inference Plots prob_id {}\n'.format(problem_id))
             x_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 11]
             y_ticks = [i for i,_ in enumerate(data_point[0].numpy()) if _ != 11]
             x_labels = [_ for i,_ in enumerate(data_point[0].numpy()) if _ != 11]
-            #print(y_ticks)
             axes.set_xticks(ticks = x_ticks)
             axes.set_yticks(ticks = y_ticks)
             axes.set_xticklabels(x_labels)
@@ -506,23 +447,16 @@ class Test():
           input_index: input index for which we want to plot attention plots. In case of batch of inputs is sent
 
         '''
-
-
         data_point = None
         for b in self.test_dataset:
-            #print(b)
             num_points = len(b[0])
             ind = random.randint(0,num_points-1)
             data_point = b[0][ind]
             target = b[1].numpy()[ind]
-            #print(data_point)
             break
-
-        #print(self.model.layers)
 
         prediction = self.model(tf.expand_dims(data_point, axis=0))
         _ , att_scores = self.model.layers[1](tf.expand_dims(data_point, axis=0))
-        #print(att_scores)
         if(self.problem_id in [1,2,4,7]):
             print(f'Prediction: {prediction}')
         else:
@@ -531,33 +465,16 @@ class Test():
         input_att_scores = layer_att_scores[input_index]
         num_heads = input_att_scores.shape[0]
         fig, ax = plt.subplots(1, num_heads, figsize=(16,16))
-        # plt.show()
-        #print(num_heads)
-        #print(ax)
         if(num_heads > 1):
             for index,axes in enumerate(ax):
               head_att_score = input_att_scores[index]
-
-
-              # ax = fig.add_subplot(2, 4, head+1)
-              #ax.matshow(head_att_score, cmap='viridis')
               self.plot(axes, head_att_score, tf.expand_dims(data_point, axis=0), self.problem_id, target)
         else:
             self.plot(ax, input_att_scores[0], tf.expand_dims(data_point, axis=0), self.problem_id, target)
 
         plt.savefig('infer.png')
 
-        #plt.tight_layout()
-
-
-
-
-
-
-
-
 def _train(args):
-
 
     print(f"Training/Inference for problem id {args.problem_id}")
     if(args.problem_id == 1):
@@ -603,8 +520,6 @@ def _train(args):
         dataset_ob = dataset.MinDataset(vocab=vocab, max_seq_length = args.seq_length)
         train_dataset, test_dataset = dataset_ob.gen_data()
 
-
-
     if(args.training == 'true'):
         train_ob = Train(args, train_dataset, test_dataset, 64)
         model, history = train_ob.train_model()
@@ -615,20 +530,6 @@ def _train(args):
         model.load_weights(checkpoint_path)
         test_ob = Test(model, test_dataset, args.problem_id, args.seq_length)
         test_ob.attention_plots()
-
-
-
-
-    # input_shape = (args.seq_length)
-    # config = hyperparams.Config(args.num_heads, args.num_layers, args.emb_dim, args.seq_length, args.vocab_size, args.head_size, args.pos_embedding, args.agg_method, args.pos_embedding_type)
-    # input = Input(input_shape)
-    # op, att_scores = model._Model(config['emb_dim'], config['seq_length'], config['vocab_size'], config['pos_embedding'], config['num_heads'], config['head_size'], config['agg_method'],
-    # config['pos_embedding_type'])(input)
-    # output = Dense(1, activation='linear')(op)
-
-    # _model = Model(inputs = input, outputs=output)
-    # print(_model.summary())
-
 
 if __name__ == '__main__':
 
