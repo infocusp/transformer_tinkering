@@ -19,12 +19,12 @@ We will test the model on some basic problems briefly described below:
 For a particular experiment we first generate the data which is used for training and evaluation purposes. Dataset generation utilities can be found in the dataset module. Once the data is generated we train our model for a specific problem, while training we save the attention plots for each epoch. Looking at the attention plots we actually get some idea about the things the model is attending to.
 
 Below plot shows the model attending to important tokens required to solve problem 3.
-| ![](https://github.com/InFoCusp/transformer_tinkering/blob/main/problem_3_infer.png?raw=true) |
+| ![](https://github.com/InFoCusp/transformer_tinkering/blob/main/images/problem_3_infer.png?raw=true) |
 |:--:| 
 | *Attention plots for each head showing model attending to the token occuring maximum number of times (24 in this case).* |
 
 Another one below shows the attention plot where the model is attending to important token required to solve the problem 8, which is maximum number from the sequence.
-| ![](https://github.com/InFoCusp/transformer_tinkering/blob/main/problem_8_infer(2).png?raw=true) |
+| ![](https://github.com/InFoCusp/transformer_tinkering/blob/main/images/problem_8_infer(2).png?raw=true) |
 |:--:| 
 | *Attention plots showing model heads attending to the maximum token 9 in this case. (Note 10 is used for CLS token)* |
 
